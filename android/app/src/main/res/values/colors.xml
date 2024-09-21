@@ -1,0 +1,6 @@
+<resources>
+    <!-- Define missing Facebook SDK colors -->
+    <color name="com_facebook_button_background_color_focused_disabled">#FFB0B0B0</color>
+    <color name="com_facebook_button_background_color_focused">#FF3B5998</color>
+    <color name="com_facebook_button_border_color_focused">#FF3B5998</color>
+</resources>
