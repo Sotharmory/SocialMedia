@@ -51,12 +51,7 @@ class SignInBackEnd with ChangeNotifier {
 
         // Example of using Users.fromJson to deserialize the response
         Users user = Users.fromJson(userData);
-        print('User object: $user');
 
-        // Store user data and authentication status in SharedPreferences
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('isSignedIn', true);
-        await prefs.setString('userData', jsonEncode(userData));
 
         return true;
       } else {
@@ -74,6 +69,7 @@ class SignInBackEnd with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('isSignedIn');
     await prefs.remove('userData');
+    await prefs.remove('user_id');
     notifyListeners();
   }
 

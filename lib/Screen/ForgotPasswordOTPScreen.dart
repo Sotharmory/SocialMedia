@@ -59,7 +59,7 @@ class _ForgotPasswordOTPScreenState extends State<ForgotPasswordOTPScreen> {
       backgroundColor: Color(0xfff7f6fb),
       body: SafeArea(
         child: Padding(
-          padding: EdgeInsets.symmetric(vertical: 24, horizontal: 32),
+          padding: EdgeInsets.symmetric(vertical: 24, horizontal: 0),
           child: Column(
             children: [
               Align(

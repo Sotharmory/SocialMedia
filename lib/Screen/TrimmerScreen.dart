@@ -46,10 +46,11 @@ class _TrimmerViewState extends State<TrimmerView> {
 
         if (outputPath != null) {
           final File outputFile = File(outputPath);
-          Navigator.of(context)
-              .pop(outputFile); // Pass the file back to the previous screen
+          Navigator.of(context).pop(outputFile);
         } else {
-          debugPrint('Error: Output path is null');
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Failed to save trimmed video')),
+          );
         }
       },
     );

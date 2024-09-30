@@ -11,20 +11,59 @@ import 'package:lottie/lottie.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  final String baseUrl = 'http://10.0.2.2:5000/api';
+  final String baseUrl = 'http://10.0.2.2:5000';
 
   Future<List<Users>> fetchUsers() async {
-    final response = await http.get(Uri.parse('$baseUrl/users'));
-
+    final response = await http.get(Uri.parse('$baseUrl/api/users'));
     if (response.statusCode == 200) {
       List<dynamic> data = json.decode(response.body);
       print('API Response: $data'); // Print the entire response
-      return data.map((json) {
-        print('User JSON from API: $json'); // Print each user JSON
-        return Users.fromJson(json);
-      }).toList();
+
+      List<Users> users = [];
+
+      // Lấy user ID của người dùng hiện tại
+      final currentUserId = await UserInfoProvider().getUserID();
+
+      for (var userJson in data) {
+        print('User JSON from API: $userJson'); // Print each user JSON
+        Users user = Users.fromJson(userJson);
+
+        // Kiểm tra xem người dùng này có bị block không
+        final isBlocked = await isUserBlocked(currentUserId!, user.userID);
+
+        if (!isBlocked) {
+          users.add(user); // Chỉ thêm vào danh sách nếu không bị block
+        }
+      }
+
+      return users;
     } else {
       throw Exception('Failed to load users');
+    }
+  }
+
+  Future<bool> isUserBlocked(int currentUserId, int userId) async {
+    final String baseUrl = 'http://10.0.2.2:5000';
+
+    // Yêu cầu đầu tiên
+    final response1 = await http.get(Uri.parse('$baseUrl/check_blocked/$currentUserId/$userId'));
+
+    // Yêu cầu thứ hai
+    final response2 = await http.get(Uri.parse('$baseUrl/check_blocked/$userId/$currentUserId'));
+
+    // Kiểm tra phản hồi từ yêu cầu đầu tiên
+    if (response1.statusCode == 200) {
+      final Map<String, dynamic> data = json.decode(response1.body);
+      print('Check Blocked Response (1): $data'); // In phản hồi
+      return data['is_blocked'] == true; // Trả về true nếu bị chặn
+    }
+    // Kiểm tra phản hồi từ yêu cầu thứ hai
+    else if (response2.statusCode == 200) {
+      final Map<String, dynamic> data = json.decode(response2.body);
+      print('Check Blocked Response (2): $data'); // In phản hồi khác
+      return data['is_blocked'] == true; // Trả về true nếu bị chặn
+    } else {
+      throw Exception('Failed to check if user is blocked');
     }
   }
 }

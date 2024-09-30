@@ -1,11 +1,14 @@
+import 'dart:convert';
+
 import 'package:Doune/BackEnd/ChangePassWord.dart';
 import 'package:Doune/BackEnd/GetInfoUser.dart';
+import 'package:Doune/Screen/BannedScreen.dart';
 import 'package:Doune/Screen/MenuPage.dart';
 import 'package:Doune/Utils/Snackbar.dart';
 import 'package:Doune/Utils/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
+import 'package:http/http.dart' as http;
 class AuthService {
   static Future<bool> isUserSignedIn() async {
     return Future.value(true);
@@ -169,6 +172,17 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
     );
   }
 
+  Future<bool> checkIfBanned(int userId) async {
+    final response = await http.get(Uri.parse('http://10.0.2.2:5000/check_ban/$userId'));
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['is_banned'] == true;
+    } else {
+      throw Exception('Failed to check ban status');
+    }
+  }
+
   Future<void> _handleSubmit() async {
     try {
       String password = _passwordController.text.trim();
@@ -187,21 +201,36 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
         return;
       }
 
+      // Call the API to change the password
       await _apiService.changePassword(widget.email, password);
-
       bool isSignedIn = await AuthService.isUserSignedIn();
-      await userInfoProvider.saveEmail(widget.email);
 
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool('isSignedIn', true);
+      // Fetch user info and check if the user is banned
       final userInfo = await userInfoProvider.getUserInfo(widget.email);
       if (userInfo != null && userInfo.containsKey('UserID')) {
         final userId = userInfo['UserID'];
         print('test $userId');
         if (userId != null) {
           await userInfoProvider.saveUserID(userId);
+
+          // Check if the user is banned
+          bool isBanned = await checkIfBanned(userId);
+          if (isBanned) {
+            // Navigate to BannedScreen if the user is banned
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(builder: (context) => BannedScreen(userId: userId,)),
+            );
+            return;
+          }
         }
       }
+
+      // Save signed-in status if the user is not banned
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('isSignedIn', true);
+
+      // Navigate to HomePage
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(

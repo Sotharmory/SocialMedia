@@ -106,66 +106,61 @@ class _MediaEditorState extends State<MediaEditor> {
   }
 
   Future<void> _downloadAndMergeAudio() async {
+    print("Starting _downloadAndMergeAudio");
     String? audioUrl = _selectedSound?['previewUrl'];
+    File? audioFile;
 
-    if (audioUrl == null) {
-      print('No audio URL selected.');
-      return;
+    if (_selectedSound!['trimmedFile'] != null) {
+      audioFile = _selectedSound!['trimmedFile'];
+      print("Using trimmed audio file: ${audioFile?.path}");
+    } else if (audioUrl != null) {
+      if (_audioCache.containsKey(audioUrl)) {
+        audioFile = _audioCache[audioUrl]!;
+      } else {
+        audioFile = await _downloadAudio(audioUrl);
+        if (audioFile != null) {
+          _audioCache[audioUrl] = audioFile;
+        }
+      }
     }
 
-    // Check if the audio file is already cached
-    if (_audioCache.containsKey(audioUrl)) {
-      // Use the cached file
-      File cachedAudioFile = _audioCache[audioUrl]!;
-      print('Using cached audio file path: ${cachedAudioFile.path}');
-      await mergeFiles(cachedAudioFile.path);
+    if (audioFile != null) {
+      print('Merging audio file: ${audioFile.path}');
+      await mergeAudioWithVideo(audioFile.path);
     } else {
-      // Download the audio file
-      File? downloadedAudioFile = await _downloadAudio(audioUrl);
-
-      if (downloadedAudioFile != null) {
-        print('Downloaded audio file path: ${downloadedAudioFile.path}');
-        // Cache the downloaded file
-        _audioCache[audioUrl] = downloadedAudioFile;
-        await mergeFiles(downloadedAudioFile.path);
-      } else {
-        print('Failed to download audio file.');
-      }
+      print('Failed to get audio file.');
     }
   }
 
-  Future<void> mergeFiles(String trimmedAudioPath) async {
+  Future<void> mergeAudioWithVideo(String audioPath) async {
+    print("Starting mergeAudioWithVideo");
     String videoPath = TrimmedFileX?.path ?? widget.file.path;
     String outputVideoPath =
-        '${(await getTemporaryDirectory()).path}/output_video.mp4';
+        '${(await getTemporaryDirectory()).path}/output_video_${DateTime.now().millisecondsSinceEpoch}.mp4';
 
-    // Correct command with proper stream mapping
     String commandToExecute =
-        '-y -i "$videoPath" -i "$trimmedAudioPath" -map 0:v:0 -map 1:a:0 -c:v copy -shortest "$outputVideoPath"';
+        '-y -i "$videoPath" -i "$audioPath" -map 0:v:0 -map 1:a:0 -c:v copy -shortest "$outputVideoPath"';
 
     print('Executing FFmpeg command: $commandToExecute');
-    print('Audio Path: $trimmedAudioPath');
+    print('Audio Path: $audioPath');
     print('Video Path: $videoPath');
     print('Output Path: $outputVideoPath');
 
     final session = await FFmpegKit.execute(commandToExecute);
     final returnCode = await session.getReturnCode();
-    final output = await session.getOutput();
-    final error = await session.getFailStackTrace();
 
     if (ReturnCode.isSuccess(returnCode)) {
       print('Video and audio merged successfully');
+      _initializeMedia(File(outputVideoPath));
       setState(() {
-        _initializeMedia(
-            File(outputVideoPath)); // Initialize video with the new merged file
+        // Update UI if needed
       });
-    } else if (ReturnCode.isCancel(returnCode)) {
-      print('FFmpeg execution was cancelled.');
     } else {
       print('Error merging files: Return code $returnCode');
+      final output = await session.getOutput();
+      final error = await session.getFailStackTrace();
       print('FFmpeg Output: $output');
       print('FFmpeg Error Stack Trace: $error');
-      print('Command Executed: $commandToExecute');
     }
   }
 
@@ -179,14 +174,14 @@ class _MediaEditorState extends State<MediaEditor> {
     });
   }
 
-  void _onSoundSelected(Map<String, dynamic>? sound) {
+  void _onSoundSelected(Map<String, dynamic>? sound) async {
     setState(() {
       _selectedSound = sound;
     });
     if (_selectedSound == null) {
       _handleNoSoundSelected();
     } else {
-      _downloadAndMergeAudio();
+      await _downloadAndMergeAudio();
     }
   }
 
@@ -423,7 +418,7 @@ class _MediaEditorState extends State<MediaEditor> {
                       icon: Icon(Icons.downloading, color: Colors.white),
                       onPressed: () async {
                         print(
-                            "${widget.file} - $TrimmedFileX - $_audioVolume - $_audioCache - $_volume - $_stickers");
+                            "${widget.file} - $TrimmedFileX - $_audioVolume - $_audioCache - $_volume - _stickers");
                       },
                     ),
                   ] else ...[
@@ -514,17 +509,21 @@ class _MediaEditorState extends State<MediaEditor> {
                   SizedBox(width: 8.0),
                   TextButton(
                     onPressed: () async {
-                      // Hiển thị modal bottom sheet và chờ kết quả
                       final selectedSound =
                           await showModalBottomSheet<Map<String, dynamic>>(
                         context: context,
                         builder: (BuildContext context) {
                           return SoundWidget(
-                            onAddSound: _onSoundSelected,
+                            onAddSound: (sound) {
+                              Navigator.pop(context, sound);
+                            },
                             selectedSound: _selectedSound,
                           );
                         },
                       );
+                      if (selectedSound != null) {
+                        _onSoundSelected(selectedSound);
+                      }
                     },
                     style: TextButton.styleFrom(
                       backgroundColor: Colors.blueAccent,
@@ -577,6 +576,26 @@ class _MediaEditorState extends State<MediaEditor> {
                           return SoundTrimmer(
                             selectedSound: _selectedSound,
                             audioCache: _audioCache,
+                            onTrimComplete: (File trimmedFile) async {
+                              setState(() {
+                                if (_selectedSound != null) {
+                                  // Cập nhật _selectedSound với file đã cắt
+                                  _selectedSound!['trimmedFile'] = trimmedFile;
+
+                                  // Nếu bạn vẫn muốn lưu thông tin về thời gian cắt, bạn có thể thêm:
+                                  // _selectedSound!['trimStart'] = ...; // Lấy từ SoundTrimmer nếu cần
+                                  // _selectedSound!['trimEnd'] = ...; // Lấy từ SoundTrimmer nếu cần
+                                }
+                              });
+
+                              // Xử lý file đã cắt ở đây, ví dụ:
+                              // - Cập nhật UI để hiển thị rằng audio đã được cắt
+                              // - Lưu file vào bộ nhớ local nếu cần
+                              // - Chuẩn bị file để upload lên server
+
+                              print(
+                                  'Audio trimmed successfully: ${trimmedFile.path}');
+                            },
                           );
                         },
                       );

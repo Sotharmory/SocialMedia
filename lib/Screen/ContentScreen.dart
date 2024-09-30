@@ -5,6 +5,7 @@ import 'package:Doune/BackEnd/GetInfoUser.dart';
 import 'package:Doune/Screen/OptionScreen.dart';
 import 'package:chewie/chewie.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Added import for DeviceOrientation
 import 'package:http/http.dart' as http;
 import 'package:lottie/lottie.dart';
 import 'package:video_player/video_player.dart';
@@ -16,6 +17,7 @@ class ContentScreen extends StatefulWidget {
   final int? reactions;
   final int? shares;
   final String FileID;
+  final Function(bool)? onVisibilityChanged;
 
   const ContentScreen({
     Key? key,
@@ -25,20 +27,21 @@ class ContentScreen extends StatefulWidget {
     this.reactions,
     this.shares,
     required this.FileID,
+    this.onVisibilityChanged,
   }) : super(key: key);
 
   @override
-  _ContentScreenState createState() => _ContentScreenState();
+  ContentScreenState createState() => ContentScreenState();
 }
 
-class _ContentScreenState extends State<ContentScreen> {
+class ContentScreenState extends State<ContentScreen> {
   late VideoPlayerController _videoPlayerController;
   ChewieController? _chewieController;
   final ValueNotifier<bool> _likedNotifier = ValueNotifier<bool>(false);
   int? _currentUserId;
   DateTime? _lastTapTime;
   bool _showTouchIcon = false;
-  bool _showPauseIcon = false; // Track whether to show the pause icon
+  bool _showPauseIcon = false;
   Timer? _hideIconTimer;
   Timer? _resetIconTimer;
 
@@ -53,16 +56,28 @@ class _ContentScreenState extends State<ContentScreen> {
     try {
       _videoPlayerController = VideoPlayerController.network(widget.src!);
       await _videoPlayerController.initialize();
-      _chewieController = ChewieController(
-        videoPlayerController: _videoPlayerController,
-        autoPlay: true, // Start playback automatically
-        looping: true, // Loop the video indefinitely
-        showControls: false,
-      );
-      setState(() {});
-    } catch (e, stackTrace) {
+
+      if (!mounted) return;
+
+      setState(() {
+        _chewieController = ChewieController(
+          videoPlayerController: _videoPlayerController,
+          autoPlay: true,
+          looping: true,
+          showControls: false,
+          aspectRatio: _videoPlayerController.value.aspectRatio,
+          deviceOrientationsAfterFullScreen: [DeviceOrientation.portraitUp],
+        );
+      });
+
+      _videoPlayerController.play();
+    } catch (e) {
       print('Error initializing video player: $e');
-      print('Stack trace: $stackTrace');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error loading video: $e')),
+        );
+      }
     }
   }
 
@@ -74,12 +89,10 @@ class _ContentScreenState extends State<ContentScreen> {
   Future<void> _reactToVideo() async {
     if (_currentUserId == null) return;
 
-    final url = 'http://10.0.2.2:5000/react'; // Replace with your API URL
+    final url = Uri.parse('http://10.0.2.2:5000/react');
     final response = await http.post(
-      Uri.parse(url),
-      headers: <String, String>{
-        'Content-Type': 'application/json; charset=UTF-8',
-      },
+      url,
+      headers: {'Content-Type': 'application/json; charset=UTF-8'},
       body: jsonEncode({
         'file_id': widget.FileID,
         'user_id': _currentUserId,
@@ -95,22 +108,21 @@ class _ContentScreenState extends State<ContentScreen> {
   }
 
   void _handleSingleTap() {
-    if (_videoPlayerController.value.isPlaying) {
-      _videoPlayerController.pause();
-      setState(() {
-        _showPauseIcon = true; // Hiển thị icon khi video dừng
-      });
-    } else {
-      _videoPlayerController.play();
-      setState(() {
-        _showPauseIcon = false; // Ẩn icon khi video phát
-      });
-    }
+    setState(() {
+      if (_videoPlayerController.value.isPlaying) {
+        _videoPlayerController.pause();
+        _showPauseIcon = true;
+      } else {
+        _videoPlayerController.play();
+        _showPauseIcon = false;
+      }
+    });
   }
 
   void _handleDoubleTap() {
     final now = DateTime.now();
-    if (_lastTapTime == null || now.difference(_lastTapTime!) > Duration(milliseconds: 300)) {
+    if (_lastTapTime == null ||
+        now.difference(_lastTapTime!) > Duration(milliseconds: 300)) {
       _lastTapTime = now;
       return;
     }
@@ -120,20 +132,32 @@ class _ContentScreenState extends State<ContentScreen> {
 
     _hideIconTimer?.cancel();
     _hideIconTimer = Timer(Duration(seconds: 1), () {
-      setState(() {
-        _showTouchIcon = false;
-      });
+      setState(() => _showTouchIcon = false);
     });
 
     _resetIconTimer?.cancel();
     _resetIconTimer = Timer(Duration(seconds: 2), () {
-      setState(() {
-        _showTouchIcon = false;
-      });
+      setState(() => _showTouchIcon = false);
     });
 
     _reactToVideo();
     setState(() {});
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (widget.onVisibilityChanged != null) {
+      widget.onVisibilityChanged!(true);
+    }
+  }
+
+  @override
+  void deactivate() {
+    if (widget.onVisibilityChanged != null) {
+      widget.onVisibilityChanged!(false);
+    }
+    super.deactivate();
   }
 
   @override
@@ -150,55 +174,39 @@ class _ContentScreenState extends State<ContentScreen> {
     _likedNotifier.value = !_likedNotifier.value;
   }
 
+  void playVideo() {
+    if (_videoPlayerController.value.isInitialized) {
+      _videoPlayerController.play();
+    }
+  }
+
+  void pauseVideo() {
+    if (_videoPlayerController.value.isInitialized) {
+      _videoPlayerController.pause();
+    }
+  }
+
+  bool isVideoPlaying() {
+    return _videoPlayerController.value.isPlaying;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final mediaSize = MediaQuery.of(context).size;
+    print("Building ContentScreen");
+    print("_chewieController: ${_chewieController != null}");
+    print(
+        "Video initialized: ${_chewieController?.videoPlayerController.value.isInitialized}");
 
     return Scaffold(
       body: Stack(
         fit: StackFit.expand,
         children: [
           Container(color: Colors.black),
-          _chewieController != null && _chewieController!.videoPlayerController.value.isInitialized
-              ? GestureDetector(
-            onTap: _handleSingleTap,
-            onDoubleTap: _handleDoubleTap,
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Center(
-                  child: Chewie(controller: _chewieController!),
-                ),
-                if (_showTouchIcon)
-                  Center(
-                    child: AnimatedOpacity(
-                      opacity: _showTouchIcon ? 1.0 : 0.0,
-                      duration: Duration(milliseconds: 300),
-                      child: Icon(
-                        Icons.touch_app_rounded,
-                        color: Colors.blueAccent,
-                        size: 100,
-                      ),
-                    ),
-                  ),
-                if (_showPauseIcon)
-                  Center(
-                    child: Icon(
-                      Icons.play_arrow_rounded,
-                      color: Colors.lightBlueAccent,
-                      size: 100,
-                    ),
-                  ),
-              ],
-            ),
-          )
-              : Center(
-            child: Lottie.asset(
-              'assets/Animated/loading.json',
-              width: 150,
-              height: 150,
-            ),
-          ),
+          if (_chewieController != null &&
+              _chewieController!.videoPlayerController.value.isInitialized)
+            _buildVideoPlayer()
+          else
+            _buildLoadingIndicator(),
           Positioned(
             bottom: 0,
             left: 0,
@@ -214,6 +222,108 @@ class _ContentScreenState extends State<ContentScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildVideoPlayer() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final videoRatio = _videoPlayerController.value.aspectRatio;
+        final screenRatio = constraints.maxWidth / constraints.maxHeight;
+
+        Widget mediaWidget;
+        if (videoRatio > 1) {
+          // Media is 16:9 or wider
+          // Calculate the height of the video/image
+          double mediaHeight = constraints.maxWidth / videoRatio;
+          // Calculate the height of the black bars
+          double blackBarHeight = (constraints.maxHeight - mediaHeight) / 2;
+
+          mediaWidget = Column(
+            children: [
+              Container(height: blackBarHeight, color: Colors.black),
+              SizedBox(
+                width: constraints.maxWidth,
+                height: mediaHeight,
+                child: _buildMediaContent(),
+              ),
+              Container(height: blackBarHeight, color: Colors.black),
+            ],
+          );
+        } else {
+          // Media is 9:16 or taller
+          mediaWidget = SizedBox.expand(
+            child: FittedBox(
+              fit: BoxFit.cover,
+              child: SizedBox(
+                width: constraints.maxWidth,
+                height: constraints.maxWidth / videoRatio,
+                child: _buildMediaContent(),
+              ),
+            ),
+          );
+        }
+
+        return GestureDetector(
+          onTap: _handleSingleTap,
+          onDoubleTap: _handleDoubleTap,
+          child: Container(
+            color: Colors.black,
+            child: Center(child: mediaWidget),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildMediaContent() {
+    if (_chewieController != null &&
+        _videoPlayerController.value.isInitialized) {
+      return Chewie(controller: _chewieController!);
+    } else if (_videoPlayerController.value.hasError) {
+      print(
+          'Video player error: ${_videoPlayerController.value.errorDescription}');
+      return Center(
+          child:
+              Text('Error: ${_videoPlayerController.value.errorDescription}'));
+    } else if (widget.src != null &&
+        widget.src!.toLowerCase().endsWith('.mp4')) {
+      return _buildLoadingIndicator();
+    } else if (widget.src != null) {
+      return Image.network(
+        widget.src!,
+        fit: BoxFit.cover,
+        loadingBuilder: (context, child, loadingProgress) {
+          if (loadingProgress == null) return child;
+          return _buildLoadingIndicator();
+        },
+        errorBuilder: (context, error, stackTrace) {
+          print('Error loading image: $error');
+          return Center(child: Text('Error loading image'));
+        },
+      );
+    } else {
+      return Center(child: Text('No media source provided'));
+    }
+  }
+
+  Widget _buildAnimatedIcon(IconData icon) {
+    return Center(
+      child: AnimatedOpacity(
+        opacity: 1.0,
+        duration: Duration(milliseconds: 300),
+        child: Icon(icon, color: Colors.lightBlueAccent, size: 100),
+      ),
+    );
+  }
+ 
+  Widget _buildLoadingIndicator() {
+    return Center(
+      child: Lottie.asset(
+        'assets/Animated/loading.json',
+        width: 150,
+        height: 150,
       ),
     );
   }

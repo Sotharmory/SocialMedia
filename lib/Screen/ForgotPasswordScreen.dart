@@ -28,8 +28,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     Size size = MediaQuery.of(context).size;
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: Text("Forgot Password"),
+        backgroundColor: Colors.lightBlueAccent,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            Navigator.pop(context); // Quay về trang trước
+          },
+        ),
+        title: Text(
+          "Forgot Password",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
       body: Container(
         decoration: BoxDecoration(

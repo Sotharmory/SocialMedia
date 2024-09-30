@@ -16,6 +16,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> videos = [];
   bool isLoading = true;
   Timer? _timer;
+  int _currentIndex = 0;
+  List<GlobalKey<ContentScreenState>> _contentScreenKeys = [];
 
   @override
   void initState() {
@@ -34,7 +36,10 @@ class _HomeScreenState extends State<HomeScreen> {
         final List<dynamic> jsonResponse = json.decode(response.body);
         setState(() {
           videos = jsonResponse;
-          print(videos);
+          _contentScreenKeys = List.generate(
+            videos.length,
+            (_) => GlobalKey<ContentScreenState>(),
+          );
           isLoading = false;
         });
       } else {
@@ -49,6 +54,22 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       isLoading = false;
     });
+  }
+
+  void _onIndexChanged(int index) {
+    if (_currentIndex != index) {
+      if (_currentIndex < _contentScreenKeys.length) {
+        _contentScreenKeys[_currentIndex].currentState?.pauseVideo();
+      }
+      if (index < _contentScreenKeys.length) {
+        _contentScreenKeys[index].currentState?.playVideo();
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        setState(() {
+          _currentIndex = index;
+        });
+      });
+    }
   }
 
   @override
@@ -69,50 +90,40 @@ class _HomeScreenState extends State<HomeScreen> {
 
             return Stack(
               children: [
-                // Swiper widget
                 Container(
                   width: screenWidth,
                   height: screenHeight,
                   child: isLoading
                       ? Center(
-                    child: Lottie.asset(
-                      'assets/Animated/loading.json',
-                      width: 150,
-                      height: 150,
-                    ),
-                  )
+                          child: Lottie.asset(
+                            'assets/Animated/loading.json',
+                            width: 150,
+                            height: 150,
+                          ),
+                        )
                       : Swiper(
-                    itemBuilder: (BuildContext context, int index) {
-                      return ContentScreen(
-                        src: videos[index]['url'],
-                        userInfo: videos[index]['user_info'],
-                        views: videos[index]['views'],
-                        reactions: videos[index]['reactions'],
-                        shares: videos[index]['shares'],
-                        FileID: videos[index]['file_id'],
-                      );
-                    },
-                    itemCount: videos.length,
-                    scrollDirection: Axis.vertical,
-                  ),
+                          itemBuilder: (BuildContext context, int index) {
+                            return ContentScreen(
+                              key: _contentScreenKeys[index],
+                              src: videos[index]['url'],
+                              userInfo: videos[index]['user_info'],
+                              views: videos[index]['views'],
+                              reactions: videos[index]['reactions'],
+                              shares: videos[index]['shares'],
+                              FileID: videos[index]['file_id'],
+                              onVisibilityChanged: (visible) {
+                                if (visible) {
+                                  _onIndexChanged(index);
+                                }
+                              },
+                            );
+                          },
+                          itemCount: videos.length,
+                          scrollDirection: Axis.vertical,
+                          onIndexChanged: _onIndexChanged,
+                        ),
                 ),
-                // Navigation row on top
-                Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(vertical: 0),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        _buildNavText('Following'),
-                        _buildDivider(),
-                        _buildNavText('For You'),
-                      ],
-                    ),
-                  ),
-                ),
+
               ],
             );
           },

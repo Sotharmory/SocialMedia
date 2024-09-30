@@ -4,7 +4,7 @@ import 'package:Doune/BackEnd/GetInfoUser.dart';
 import 'package:Doune/BackEnd/VideoAPIHandle.dart';
 import 'package:Doune/Screen/AvatarView.dart';
 import 'package:Doune/Screen/EditProfileScreen.dart';
-import 'package:Doune/Screen/MenuPage.dart';
+import 'package:Doune/Screen/SettingScreen.dart';
 import 'package:Doune/Screen/StoryPlayerScreen.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -12,7 +12,8 @@ import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:lottie/lottie.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Doune/Widget/FollowListScreen.dart';
+
 class UserScreen extends StatefulWidget {
   const UserScreen({Key? key}) : super(key: key);
 
@@ -38,7 +39,9 @@ String _formatNumber(int number) {
 class _UserScreenState extends State<UserScreen> {
   final userInfoProvider = UserInfoProvider();
   final uservideolist = UserVideoList();
-  final AVTVIEW = AvatarView(imageUrl: '',);
+  final AVTVIEW = AvatarView(
+    imageUrl: '',
+  );
   bool _isUploading = false; // Track upload state
 
   String? fullName;
@@ -50,6 +53,7 @@ class _UserScreenState extends State<UserScreen> {
   String? profilePictureUrl;
   int? UserId;
   bool? Verified;
+  String _selectedTab = "Featured"; // Track selected tab
 
   @override
   void initState() {
@@ -70,61 +74,13 @@ class _UserScreenState extends State<UserScreen> {
           Point = userInfo['Point'];
           UserId = userInfo['UserID'];
           Following = userInfo['Following'];
-          profilePictureUrl = "http://10.0.2.2:5000/download/avatar/${userInfo['ProfilePictureURL']}";
+          profilePictureUrl =
+              "http://10.0.2.2:5000/download/avatar/${userInfo['ProfilePictureURL']}";
           Verified = userInfo['Verified'];
         });
       }
     }
   }
-
-  Future<void> _showPopupMenu(BuildContext context) async {
-    showModalBottomSheet(
-      context: context,
-      builder: (BuildContext context) {
-        return Container(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(Icons.edit),
-                title: const Text('Edit Profile'),
-                onTap: () {
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.settings),
-                title: const Text('Settings'),
-                onTap: () {
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.logout),
-                title: const Text('Logout'),
-                onTap: () async {
-                  await userInfoProvider.removeUserID();
-                  final prefs = await SharedPreferences.getInstance();
-                  await prefs.setBool('isSignedIn', false);
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(builder: (context) => HomePage(isSignedIn: false,)),
-                        (route) => false,
-                  ); // Navigate to HomePage and remove all previous routes
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.cancel),
-                title: const Text('Cancel'),
-                onTap: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
 
   @override
   Widget build(BuildContext context) {
@@ -141,16 +97,14 @@ class _UserScreenState extends State<UserScreen> {
         elevation: 0,
         centerTitle: true,
         leading: IconButton(
-          onPressed: () => {
-
-          },
+          onPressed: () => {},
           icon: const Icon(
             Icons.monetization_on_sharp,
             size: 24,
-            color: Colors.black,
+            color: Colors.yellow,
           ),
         ),
-        title:  Row(
+        title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
@@ -161,11 +115,14 @@ class _UserScreenState extends State<UserScreen> {
                 color: Colors.black,
               ),
             ),
-            if (Verified == true || Verified == 1) // Check if Verified is true or 1
+            if (Verified == true ||
+                Verified == 1) // Check if Verified is true or 1
               const SizedBox(width: 8), // Space between name and icon
-            if (Verified == true || Verified == 1) // Check if Verified is true or 1
+            if (Verified == true ||
+                Verified == 1) // Check if Verified is true or 1
               Tooltip(
-                message: 'This is a verification badge \nby Doune. This badge will help \nyour account avoid being \ntampered with.', // Tooltip message
+                message:
+                    'This is a verification badge \nby Doune. This badge will help \nyour account avoid being \ntampered with.', // Tooltip message
                 child: InkWell(
                   onTap: () {
                     showDialog(
@@ -174,36 +131,46 @@ class _UserScreenState extends State<UserScreen> {
                         return AlertDialog(
                           title: Text(
                             'Doune verification',
-                            style: TextStyle(color: Colors.blue), // Blue color for title
+                            style: TextStyle(
+                                color: Colors.blue), // Blue color for title
                           ),
                           content: RichText(
                             text: TextSpan(
                               children: [
                                 TextSpan(
-                                  text: 'Accounts with a verified badge\nhave been verified by ',
-                                  style: TextStyle(color: Colors.black), // Default color
+                                  text:
+                                      'Accounts with a verified badge\nhave been verified by ',
+                                  style: TextStyle(
+                                      color: Colors.black), // Default color
                                 ),
                                 TextSpan(
                                   text: 'Doune',
-                                  style: TextStyle(color: Colors.blue), // Blue color for "Doune"
+                                  style: TextStyle(
+                                      color: Colors
+                                          .blue), // Blue color for "Doune"
                                 ),
                               ],
                             ),
                           ),
                           actions: [
                             Row(
-                              mainAxisAlignment: MainAxisAlignment.end, // Căn chỉnh nội dung về bên phải
+                              mainAxisAlignment: MainAxisAlignment
+                                  .end, // Căn chỉnh nội dung về bên phải
                               children: [
                                 ElevatedButton(
                                   onPressed: () {
                                     Navigator.of(context).pop();
                                   },
                                   style: ElevatedButton.styleFrom(
-                                    foregroundColor: Colors.white, backgroundColor: Colors.blue, // Màu chữ
+                                    foregroundColor: Colors.white,
+                                    backgroundColor: Colors.blue, // Màu chữ
                                     shape: RoundedRectangleBorder(
-                                      borderRadius: BorderRadius.circular(8), // Bo góc
+                                      borderRadius:
+                                          BorderRadius.circular(8), // Bo góc
                                     ),
-                                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8), // Padding của button
+                                    padding: EdgeInsets.symmetric(
+                                        horizontal: 16,
+                                        vertical: 8), // Padding của button
                                     elevation: 5, // Độ cao đổ bóng
                                   ),
                                   child: Text(
@@ -237,7 +204,15 @@ class _UserScreenState extends State<UserScreen> {
               size: 24,
               color: Colors.black,
             ),
-            onPressed: () => _showPopupMenu(context),
+            onPressed: () {
+              // Navigate to EditProfileScreen
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SettingScreen(),
+                ),
+              );
+            },
           ),
           const SizedBox(width: 24),
         ],
@@ -274,9 +249,11 @@ class _UserScreenState extends State<UserScreen> {
       children: [
         _buildImageProfile(), // Avatar on the left
         const SizedBox(width: 16), // Space between avatar and text
-        Expanded( // Allow text to take the remaining space
+        Expanded(
+          // Allow text to take the remaining space
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start, // Align text to the start
+            crossAxisAlignment:
+                CrossAxisAlignment.start, // Align text to the start
             children: [
               SizedBox(
                 height: 35,
@@ -288,7 +265,9 @@ class _UserScreenState extends State<UserScreen> {
               Align(
                 alignment: Alignment.center, // Align text to the right
                 child: Text(
-                  bio != null && bio!.isNotEmpty ? bio! : 'No bio yet!', // Check if bio is not null or empty
+                  bio != null && bio!.isNotEmpty
+                      ? bio!
+                      : 'No bio yet!', // Check if bio is not null or empty
                   style: const TextStyle(
                     fontWeight: FontWeight.normal,
                     color: Colors.black,
@@ -302,51 +281,137 @@ class _UserScreenState extends State<UserScreen> {
     );
   }
 
+  void _FollowerAlert(BuildContext context, String title, int count) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Center(
+              child: Text(
+            title,
+            style:
+                TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent),
+          )), // Đặt tiêu đề nằm giữa
+          content: SizedBox(
+            width: double.maxFinite,
+            child: FollowListScreen(
+              userId: UserId!,
+              isFollowers: true,
+            ),
+          ),
+          actions: [
+            Center(
+              child: TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(
+                  'Confirm',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+                style: TextButton.styleFrom(
+                  backgroundColor:
+                      Colors.lightBlueAccent, // Thay đổi màu nền của nút
+                ),
+              ),
+            )
+          ],
+        );
+      },
+    );
+  }
+
+  void _FollowingAlert(BuildContext context, String title, int count) {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Center(
+            child: Text(
+              title,
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.redAccent), // Tùy chỉnh kiểu chữ tiêu đề
+            ),
+          ),
+          content: SizedBox(
+            width: double.maxFinite,
+            child: FollowListScreen(
+              userId: UserId!,
+              isFollowers: false,
+            ),
+          ),
+          actions: [
+            Center(
+              child: TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(
+                  'Confirm',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.bold),
+                ),
+                style: TextButton.styleFrom(
+                  backgroundColor:
+                      Colors.lightBlueAccent, // Thay đổi màu nền của nút
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Row _buildDescription() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              _formatNumber(Following ?? 0),
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: Colors.black,
+        GestureDetector(
+          onTap: () => _FollowingAlert(context, "Following", Following ?? 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                _formatNumber(Following ?? 0),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Colors.black,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              "Following",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
+              const SizedBox(height: 8),
+              const Text(
+                "Following",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Text(
-              _formatNumber(Follower ?? 0),
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 16,
-                color: Colors.black,
+        GestureDetector(
+          onTap: () => _FollowerAlert(context, "Followers", Follower ?? 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Text(
+                _formatNumber(Follower ?? 0),
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: Colors.black,
+                ),
               ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              "Followers",
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
+              const SizedBox(height: 8),
+              const Text(
+                "Followers",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey,
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         Column(
           crossAxisAlignment: CrossAxisAlignment.center,
@@ -392,27 +457,27 @@ class _UserScreenState extends State<UserScreen> {
             borderRadius: BorderRadius.circular(60),
             child: profilePictureUrl != null
                 ? Image.network(
-              profilePictureUrl!,
-              width: 120,
-              fit: BoxFit.cover,
-              errorBuilder: (context, error, stackTrace) {
-                return Image.network('https://via.placeholder.com/150');
-              },
-              loadingBuilder: (BuildContext context, Widget child,
-                  ImageChunkEvent? loadingProgress) {
-                if (loadingProgress == null) {
-                  return child;
-                }
-                return Center(
-                  child: CircularProgressIndicator(
-                    value: loadingProgress.expectedTotalBytes != null
-                        ? loadingProgress.cumulativeBytesLoaded /
-                        loadingProgress.expectedTotalBytes!
-                        : null,
-                  ),
-                );
-              },
-            )
+                    profilePictureUrl!,
+                    width: 120,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Image.network('https://via.placeholder.com/150');
+                    },
+                    loadingBuilder: (BuildContext context, Widget child,
+                        ImageChunkEvent? loadingProgress) {
+                      if (loadingProgress == null) {
+                        return child;
+                      }
+                      return Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded /
+                                  loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
+                      );
+                    },
+                  )
                 : Image.network('https://via.placeholder.com/150'),
           ),
         ),
@@ -451,14 +516,16 @@ class _UserScreenState extends State<UserScreen> {
                           IconButton(
                             icon: const Icon(Icons.close),
                             onPressed: () {
-                              Navigator.of(context).pop(); // Close the bottom sheet
+                              Navigator.of(context)
+                                  .pop(); // Close the bottom sheet
                             },
                           ),
                         ],
                       ),
                       // Content of the EditProfileScreen
                       Expanded(
-                        child: EditProfileScreen(), // Ensure it takes up remaining space
+                        child:
+                            EditProfileScreen(), // Ensure it takes up remaining space
                       ),
                     ],
                   ),
@@ -467,7 +534,7 @@ class _UserScreenState extends State<UserScreen> {
             );
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey[250],
+            backgroundColor: Colors.lightBlueAccent,
             minimumSize: const Size(120, 45),
             elevation: 8,
             shadowColor: Colors.green.withOpacity(0.3),
@@ -479,7 +546,7 @@ class _UserScreenState extends State<UserScreen> {
             'Edit Profile',
             style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: Colors.black,
+              color: Colors.white,
             ),
           ),
         ),
@@ -497,7 +564,7 @@ class _UserScreenState extends State<UserScreen> {
             });
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey[250], // Different color
+            backgroundColor: Colors.blueAccent, // Different color
             minimumSize: const Size(120, 45),
             elevation: 8,
             shadowColor: Colors.grey.withOpacity(0.3),
@@ -506,10 +573,12 @@ class _UserScreenState extends State<UserScreen> {
             ),
           ),
           child: Text(
-            userName != null ? '@$userName' : 'Loading...', // Display username or loading text
+            userName != null
+                ? '@$userName'
+                : 'Loading...', // Display username or loading text
             style: const TextStyle(
               fontWeight: FontWeight.w600,
-              color: Colors.black,
+              color: Colors.white,
             ),
           ),
         ),
@@ -520,31 +589,100 @@ class _UserScreenState extends State<UserScreen> {
   Row _buildTabBar() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.start,
-      children: const [
-        Text(
-          "Featured",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-            color: Colors.black,
+      children: [
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedTab = "Featured";
+            });
+          },
+          child: AnimatedContainer(
+            duration: Duration(milliseconds: 300),
+            padding: EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: _selectedTab == "Featured"
+                      ? Colors.redAccent
+                      : Colors.transparent,
+                  width: 2,
+                ),
+              ),
+            ),
+            child: Text(
+              "Featured",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: _selectedTab == "Featured"
+                    ? Colors.lightBlueAccent
+                    : Colors.grey,
+              ),
+            ),
           ),
         ),
-        SizedBox(width: 24),
-        Text(
-          "Story",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-            color: Colors.grey,
+        const SizedBox(width: 24),
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedTab = "Storage Area";
+            });
+          },
+          child: AnimatedContainer(
+            duration: Duration(milliseconds: 300),
+            padding: EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: _selectedTab == "Storage Area"
+                      ? Colors.redAccent
+                      : Colors.transparent,
+                  width: 2,
+                ),
+              ),
+            ),
+            child: Text(
+              "Storage Area",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: _selectedTab == "Storage Area"
+                    ? Colors.lightBlueAccent
+                    : Colors.grey,
+              ),
+            ),
           ),
         ),
-        SizedBox(width: 24),
-        Text(
-          "Tagged",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-            color: Colors.grey,
+        const SizedBox(width: 24),
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedTab = "Touched";
+            });
+          },
+          child: AnimatedContainer(
+            duration: Duration(milliseconds: 300),
+            padding: EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: _selectedTab == "Touched"
+                      ? Colors.redAccent
+                      : Colors.transparent,
+                  width: 2,
+                ),
+              ),
+            ),
+            child: Text(
+              "Touched",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: _selectedTab == "Touched"
+                    ? Colors.lightBlueAccent
+                    : Colors.grey,
+              ),
+            ),
           ),
         ),
         Spacer(),
@@ -552,7 +690,6 @@ class _UserScreenState extends State<UserScreen> {
       ],
     );
   }
-
 
   Widget _buildGridList() {
     final userId = UserId;
@@ -567,8 +704,17 @@ class _UserScreenState extends State<UserScreen> {
       );
     }
 
+    print('Fetching videos for user ID: $userId'); // Debugging output
+
+    Future<List<FileItem>> futureVideos;
+    if (_selectedTab == "Featured") {
+      futureVideos = uservideolist.VideoFeatured(userId);
+    } else {
+      futureVideos = uservideolist.fetchUserVideos(userId);
+    }
+
     return FutureBuilder<List<FileItem>>(
-      future: uservideolist.fetchUserVideos(userId),
+      future: futureVideos,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(
@@ -581,7 +727,15 @@ class _UserScreenState extends State<UserScreen> {
         } else if (snapshot.hasError) {
           return Center(child: Text('Error: ${snapshot.error}'));
         } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
-          return Center(child: Text('You do not have any story, upload your first story now!',style: TextStyle(color: Colors.blueAccent,fontWeight: FontWeight.bold),));
+          return Center(
+            child: Text(
+              'You don\'t have any story',
+              style: TextStyle(
+                color: Colors.blueAccent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          );
         } else {
           final videos = snapshot.data!;
           return SizedBox(
@@ -603,8 +757,9 @@ class _UserScreenState extends State<UserScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (context) => MediaDisplayScreen(
-                          url: video.url,
-                          type: video.type,
+                          videos: videos,
+                          initialIndex: index,
+                          user: true,
                         ),
                       ),
                     );
@@ -616,8 +771,8 @@ class _UserScreenState extends State<UserScreen> {
                         decoration: BoxDecoration(
                           border: Border.all(
                             color: video.type == 'video'
-                                ? Colors.redAccent
-                                : Colors.blueAccent,
+                                ? Colors.lightBlueAccent
+                                : Colors.redAccent,
                             width: 3.0,
                           ),
                           borderRadius: BorderRadius.circular(12),
@@ -628,36 +783,40 @@ class _UserScreenState extends State<UserScreen> {
                             width: double.infinity,
                             height: double.infinity,
                             child: video.type == 'video'
-                                ? Container(
-                              color: Colors.black,
-                              child: Center(
-                                child: Icon(
-                                  Icons.play_circle_outline,
-                                  color: Colors.white,
-                                  size: 50.0,
-                                ),
-                              ),
-                            )
+                                ? Image.network(
+                                    video.thumbnailUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      print('Error loading thumbnail: $error');
+                                      return Image.network(
+                                        'https://example.com/placeholder.png',
+                                        fit: BoxFit.cover,
+                                      );
+                                    },
+                                  )
                                 : Image.network(
-                              video.url,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) {
-                                return Image.network(
-                                  'https://example.com/placeholder.png',
-                                  fit: BoxFit.cover,
-                                );
-                              },
-                            ),
+                                    video.url,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      print('Error loading image: $error');
+                                      return Image.network(
+                                        'https://example.com/placeholder.png',
+                                        fit: BoxFit.cover,
+                                      );
+                                    },
+                                  ),
                           ),
                         ),
                       ),
                       Positioned(
                         bottom: 0,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 6, horizontal: 10),
                           margin: const EdgeInsets.only(bottom: 12),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.6), // Semi-transparent background
+                            color: Colors.black.withOpacity(
+                                0.6), // Semi-transparent background
                             borderRadius: BorderRadius.circular(24),
                           ),
                           child: Row(
@@ -694,7 +853,8 @@ class _UserScreenState extends State<UserScreen> {
 
   Future<void> _uploadImage() async {
     final ImagePicker _picker = ImagePicker();
-    final XFile? pickedFile = await _picker.pickImage(source: ImageSource.gallery);
+    final XFile? pickedFile =
+        await _picker.pickImage(source: ImageSource.gallery);
 
     if (pickedFile != null) {
       try {
@@ -708,20 +868,21 @@ class _UserScreenState extends State<UserScreen> {
         request.files.add(
           kIsWeb
               ? http.MultipartFile.fromBytes(
-            'file',
-            bytes,
-            filename: pickedFile.name,
-          )
+                  'file',
+                  bytes,
+                  filename: pickedFile.name,
+                )
               : await http.MultipartFile.fromPath(
-            'file',
-            pickedFile.path,
-          ),
+                  'file',
+                  pickedFile.path,
+                ),
         );
 
         // Add the UserID field
         final userid = await userInfoProvider.getUserID();
         if (userid != null) {
-          request.fields['user_id'] = userid.toString(); // Ensure the field matches API
+          request.fields['user_id'] =
+              userid.toString(); // Ensure the field matches API
         } else {
           throw Exception('UserID is null');
         }
@@ -734,7 +895,8 @@ class _UserScreenState extends State<UserScreen> {
           final result = json.decode(String.fromCharCodes(responseData));
 
           setState(() {
-            profilePictureUrl = result['file_url'] as String; // Update the profile picture URL
+            profilePictureUrl =
+                result['file_url'] as String; // Update the profile picture URL
           });
 
           ScaffoldMessenger.of(context).showSnackBar(
@@ -746,7 +908,8 @@ class _UserScreenState extends State<UserScreen> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to upload image. Status code: ${response.statusCode}'),
+              content: Text(
+                  'Failed to upload image. Status code: ${response.statusCode}'),
               backgroundColor: Colors.red,
             ),
           );
@@ -789,7 +952,6 @@ class _UserScreenState extends State<UserScreen> {
                 title: const Text('Tải Ảnh Lên'),
                 onTap: () async {
                   await _uploadImage();
-                  
                 },
               ),
               ListTile(
@@ -800,7 +962,8 @@ class _UserScreenState extends State<UserScreen> {
                     context: context,
                     builder: (BuildContext context) {
                       return Dialog(
-                        insetPadding: EdgeInsets.all(20), // Adjust padding to add space around the image
+                        insetPadding: EdgeInsets.all(
+                            20), // Adjust padding to add space around the image
                         child: Stack(
                           children: [
                             Positioned(
@@ -825,7 +988,8 @@ class _UserScreenState extends State<UserScreen> {
                               top: 8,
                               left: 8,
                               child: IconButton(
-                                icon: const Icon(Icons.close, color: Colors.black),
+                                icon: const Icon(Icons.close,
+                                    color: Colors.black),
                                 onPressed: () {
                                   Navigator.of(context).pop();
                                 },

@@ -1,30 +1,35 @@
 import 'dart:convert';
-
-import 'package:custom_clippers/custom_clippers.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:logger/logger.dart';
-import 'package:socket_io_client/socket_io_client.dart' as socket_io;
+import 'package:custom_clippers/custom_clippers.dart'; // Add this import for the clippers
+import 'package:Doune/Services/SocketService.dart';
+import 'package:lottie/lottie.dart';
+import 'package:rxdart/rxdart.dart';
 
 class Chat {
   final String content;
   final DateTime time;
+  final int senderId; // Add senderId field
 
-  const Chat({required this.content, required this.time});
+  const Chat(
+      {required this.content,
+      required this.time,
+      required this.senderId}); // Update constructor
 
-  // Factory constructor to create a Chat instance from JSON
   factory Chat.fromJson(Map<String, dynamic> json) {
     return Chat(
-      content: json['content'] ?? '',
-      time: DateTime.parse(json['time'] as String),
+      content: json['text'] ?? '',
+      time: DateTime.parse(json['timestamp'] as String),
+      senderId: json['sender_id'] ?? 0, // Parse senderId
     );
   }
 
-  // Method to convert a Chat instance to JSON
   Map<String, dynamic> toJson() {
     return {
       'content': content,
-      'time': time.toIso8601String(), // Convert DateTime to ISO8601 format
+      'time': time.toIso8601String(),
+      'sender_id': senderId, // Add senderId to JSON
     };
   }
 }
@@ -49,80 +54,91 @@ class ChatScreen extends StatefulWidget {
 
 class _ChatScreenState extends State<ChatScreen> {
   late TextEditingController _messageController;
-  socket_io.Socket? socket;
   final Logger _logger = Logger();
   List<Chat> chats = [];
   final ScrollController _scrollController = ScrollController();
   final FocusNode _focusNode = FocusNode();
+  final socketService = SocketService();
+  late int resolvedUserId;
+  final _chatsSubject = BehaviorSubject<List<Chat>>();
+  bool _showGoDownButton = false;
 
   @override
   void initState() {
     super.initState();
     _messageController = TextEditingController();
-    _initializeSocket(); // Call _initializeSocket() here to reconnect the socket
-    _scrollController.addListener(_scrollToBottom);
+    _scrollController.addListener(_scrollListener);
+    widget.userId.then((userId) {
+      if (userId != null) {
+        resolvedUserId = userId;
+        socketService.joinRoom(resolvedUserId);
+        _fetchMessages(resolvedUserId).then((messages) {
+          if (mounted) {
+            _chatsSubject.add(
+                messages.map((message) => Chat.fromJson(message)).toList());
+            WidgetsBinding.instance
+                .addPostFrameCallback((_) => _scrollToBottom());
+          }
+        });
+      } else {
+        _logger.e('User ID is null');
+      }
+    });
+
+    socketService.onNewMessage((data) {
+      if (mounted) {
+        final currentChats = _chatsSubject.valueOrNull ?? [];
+        final newMessage = Chat.fromJson(data);
+        if (newMessage.senderId == widget.contactId) {
+          currentChats.add(newMessage);
+          _chatsSubject.add(currentChats);
+          _scrollToBottom();
+        }
+      }
+    });
+
+    // Scroll to bottom when entering the chat screen
+    WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+  }
+
+  void _scrollListener() {
+    if (_scrollController.position.atEdge) {
+      if (_scrollController.position.pixels == 0) {
+        // At the top of the list
+        setState(() {
+          _showGoDownButton = true;
+        });
+      } else {
+        // At the bottom of the list
+        setState(() {
+          _showGoDownButton = false;
+        });
+      }
+    } else {
+      setState(() {
+        _showGoDownButton = true;
+      });
+    }
   }
 
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
-      final offset = _scrollController.position.maxScrollExtent;
-      // Only scroll if the user is already at the bottom or within a certain threshold
-      if (_scrollController.offset >= _scrollController.position.maxScrollExtent - 100) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
         _scrollController.animateTo(
-          offset,
+          _scrollController.position.maxScrollExtent,
           duration: Duration(milliseconds: 300),
           curve: Curves.easeInOut,
         );
-      }
-    }
-  }
-
-  void _initializeSocket() {
-    socket = socket_io.io(
-      'http://10.0.2.2:5000',
-      socket_io.OptionBuilder()
-          .setTransports(['websocket'])
-          .enableAutoConnect()
-          .build(),
-    );
-    _setupSocketListeners();
-  }
-
-  void _setupSocketListeners() {
-    socket?.on('connect', (_) => _logger.i('Connected'));
-    socket?.on('disconnect', (_) => _logger.i('Disconnected'));
-    socket?.on('chat', (data) {
-      setState(() {
-        chats = [Chat.fromJson(data), ...chats];
       });
-    });
-  }
-
-  void sendChat() {
-    if (_messageController.text.isNotEmpty) {
-      if (socket?.connected ?? false) {
-        // Socket is connected, send the message
-        final chat = Chat(content: _messageController.text, time: DateTime.now());
-        socket?.emit('chat', chat.toJson());
-        _messageController.clear();
-        setState(() {
-          chats = [chat, ...chats];
-        });
-      } else {
-        // Socket is not connected, reconnect and then send the message
-        _initializeSocket();
-        Future.delayed(Duration(milliseconds: 500), () {
-          sendChat(); // Call sendChat again after reconnecting
-        });
-      }
     }
   }
 
   @override
   void dispose() {
-    socket?.close();
-    socket?.dispose(); // Add this line to dispose of the socket
     _messageController.dispose();
+    _scrollController.dispose();
+    _focusNode.dispose();
+    _chatsSubject.close();
     super.dispose();
   }
 
@@ -142,7 +158,8 @@ class _ChatScreenState extends State<ChatScreen> {
     }
   }
 
-  Future<void> _sendMessage(int senderId, int receiverId, String message) async {
+  Future<void> _sendMessage(
+      int senderId, int receiverId, String message) async {
     try {
       final response = await http.post(
         Uri.parse('http://10.0.2.2:5000/send_message'),
@@ -156,6 +173,19 @@ class _ChatScreenState extends State<ChatScreen> {
 
       if (response.statusCode == 200) {
         _logger.i('Message sent successfully');
+        socketService.sendMessage({
+          'sender_id': senderId,
+          'receiver_id': receiverId,
+          'text': message,
+          'timestamp': DateTime.now().toIso8601String(),
+        });
+        setState(() {
+          chats.add(Chat(
+              content: message,
+              time: DateTime.now(),
+              senderId: senderId)); // Update Chat constructor
+        });
+        _scrollToBottom();
       } else {
         _logger.e('Failed to send message: ${response.body}');
       }
@@ -170,14 +200,17 @@ class _ChatScreenState extends State<ChatScreen> {
       appBar: PreferredSize(
         preferredSize: Size.fromHeight(70.0),
         child: Padding(
-          padding: EdgeInsets.only(top: 5),
+          padding: EdgeInsets.only(top: 0),
           child: AppBar(
+            backgroundColor: Colors.lightBlueAccent,
             leading: GestureDetector(
               onTap: () {
-                socket?.close(); // Close the socket when the back button is clicked
-                Navigator.pop(context); // Go back to the previous screen
+                Navigator.pop(context);
               },
-              child: Icon(Icons.arrow_back_ios_new_outlined, color: Colors.lightBlueAccent,),
+              child: Icon(
+                Icons.arrow_back_ios_new_outlined,
+                color: Colors.white,
+              ),
             ),
             leadingWidth: 50,
             title: Row(
@@ -194,7 +227,10 @@ class _ChatScreenState extends State<ChatScreen> {
                 SizedBox(width: 10),
                 Text(
                   widget.contactName,
-                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                  style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold),
                 ),
               ],
             ),
@@ -215,125 +251,188 @@ class _ChatScreenState extends State<ChatScreen> {
           ),
         ),
       ),
-      body: FutureBuilder<int?>(
-        future: widget.userId,
-        builder: (context, userSnapshot) {
-          if (userSnapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          } else if (userSnapshot.hasError) {
-            return Center(child: Text('Error: ${userSnapshot.error}'));
-          } else if (!userSnapshot.hasData || userSnapshot.data == null) {
-            return Center(child: Text('User ID not found'));
-          } else {
-            final resolvedUserId = userSnapshot.data!;
+      body: Stack(
+        children: [
+          FutureBuilder<int?>(
+            future: widget.userId,
+            builder: (context, userSnapshot) {
+              if (userSnapshot.connectionState == ConnectionState.waiting) {
+                return Center(
+                    child: Lottie.asset('assets/Animated/loading.json',
+                        height: 100));
+              } else if (userSnapshot.hasError) {
+                return Center(child: Text('Error: ${userSnapshot.error}'));
+              } else if (!userSnapshot.hasData || userSnapshot.data == null) {
+                return Center(child: Text('User ID not found'));
+              } else {
+                final resolvedUserId = userSnapshot.data!;
 
-            return FutureBuilder<List<dynamic>>(
-              future: _fetchMessages(resolvedUserId),
-              builder: (context, messageSnapshot) {
-                if (messageSnapshot.connectionState == ConnectionState.waiting) {
-                  return Center(child: CircularProgressIndicator());
-                } else if (messageSnapshot.hasError) {
-                  return Center(child: Text('Error: ${messageSnapshot.error}'));
-                } else if (!messageSnapshot.hasData || messageSnapshot.data!.isEmpty) {
-                  return Center(child: Text('No messages'));
-                } else {
-                  final messages = messageSnapshot.data!;
-                  WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-                  return Column(
-                    children: [
-                      Expanded(
-                        child: ListView.builder(
-                          controller: _scrollController,
-                          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                          itemCount: messages.length,
-                          itemBuilder: (context, index) {
-                            final message = messages[index];
-                            final isOutgoing = message['sender_id'] == resolvedUserId;
+                return StreamBuilder<List<Chat>>(
+                  stream: _chatsSubject.stream,
+                  builder: (context, chatSnapshot) {
+                    if (!chatSnapshot.hasData) {
+                      return Center(
+                          child: Lottie.asset('assets/Animated/loading.json',
+                              height: 100));
+                    }
+                    final chats = chatSnapshot.data!;
+                    return Column(
+                      children: [
+                        Expanded(
+                          child: ListView.builder(
+                            controller: _scrollController,
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 20, vertical: 10),
+                            itemCount: chats.length,
+                            itemBuilder: (context, index) {
+                              final chat = chats[index];
+                              final isOutgoing =
+                                  chat.senderId == resolvedUserId;
+                              final showAvatar = (index == 0 ||
+                                  chats[index - 1].senderId != chat.senderId);
 
-                            return Padding(
-                              padding: EdgeInsets.only(bottom: 10),
-                              child: Align(
-                                alignment: isOutgoing ? Alignment.centerRight : Alignment.centerLeft,
-                                child: ClipPath(
-                                  clipper: isOutgoing ? LowerNipMessageClipper(MessageType.send) : UpperNipMessageClipper(MessageType.receive),
-                                  child: Container(
-                                    padding: EdgeInsets.all(15),
-                                    constraints: BoxConstraints(
-                                      maxWidth: MediaQuery.of(context).size.width * 0.75,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: isOutgoing ? Colors.blue : Colors.white,
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.grey.withOpacity(0.5),
-                                          blurRadius: 10,
-                                          spreadRadius: 2,
-                                          offset: Offset(0, 3),
+                              return Padding(
+                                padding: EdgeInsets.only(bottom: 10),
+                                child: Align(
+                                  alignment: isOutgoing
+                                      ? Alignment.centerRight
+                                      : Alignment.centerLeft,
+                                  child: Row(
+                                    mainAxisAlignment: isOutgoing
+                                        ? MainAxisAlignment.end
+                                        : MainAxisAlignment.start,
+                                    children: [
+                                      if (!isOutgoing && showAvatar)
+                                        Padding(
+                                          padding: EdgeInsets.only(
+                                              right:
+                                                  10), // Move avatar to the left
+                                          child: CircleAvatar(
+                                            backgroundImage: NetworkImage(
+                                                widget.profilePictureUrl),
+                                            radius: 20,
+                                          ),
                                         ),
-                                      ],
-                                    ),
-                                    child: Text(
-                                      message['text'] ?? 'No content',
-                                      style: TextStyle(color: isOutgoing ? Colors.white : Colors.black),
-                                      softWrap: true,
-                                    ),
+                                      Container(
+                                        padding: EdgeInsets.all(15),
+                                        constraints: BoxConstraints(
+                                          maxWidth: MediaQuery.of(context)
+                                                  .size
+                                                  .width *
+                                              0.75,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: isOutgoing
+                                              ? Colors.lightBlueAccent
+                                              : Colors.grey,
+                                          borderRadius: BorderRadius.circular(
+                                              20), // Rounded corners
+                                          boxShadow: [
+                                            BoxShadow(
+                                              color:
+                                                  Colors.grey.withOpacity(0.5),
+                                              blurRadius: 10,
+                                              spreadRadius: 2,
+                                              offset: Offset(0, 3),
+                                            ),
+                                          ],
+                                        ),
+                                        child: Text(
+                                          chat.content,
+                                          style: TextStyle(color: Colors.white),
+                                          softWrap: true,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         ),
-                      ),
-                      Divider(height: 2, color: Colors.black),
-                      Padding(
-                        padding: EdgeInsets.symmetric(horizontal: 10),
-                        child: Row(
-                          children: [
-                            Padding(
-                              padding: EdgeInsets.only(left: 10),
-                              child: Icon(Icons.add_circle, color: Colors.lightBlueAccent, size: 30,),
-                            ),
-                            Padding(
-                              padding: EdgeInsets.only(left: 5),
-                              child: Icon(Icons.emoji_emotions, color: Colors.lightBlueAccent, size: 30,),
-                            ),
-                            Expanded(
-                              child: Padding(
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 10),
+                          child: Row(
+                            children: [
+                              Padding(
                                 padding: EdgeInsets.only(left: 10),
-                                child: TextFormField(
-                                  controller: _messageController,
-                                  focusNode: _focusNode, // Add the FocusNode
-                                  decoration: InputDecoration(
-                                    hintText: "Type your message...",
-                                    border: InputBorder.none,
+                                child: Icon(
+                                  Icons.add_circle,
+                                  color: Colors.lightBlueAccent,
+                                  size: 30,
+                                ),
+                              ),
+                              Padding(
+                                padding: EdgeInsets.only(left: 5),
+                                child: Icon(
+                                  Icons.emoji_emotions,
+                                  color: Colors.lightBlueAccent,
+                                  size: 30,
+                                ),
+                              ),
+                              Expanded(
+                                child: Padding(
+                                  padding: EdgeInsets.only(left: 10),
+                                  child: TextFormField(
+                                    controller: _messageController,
+                                    focusNode: _focusNode,
+                                    decoration: InputDecoration(
+                                      hintText: "Type your message...",
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(20),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      filled: true,
+                                      fillColor: Colors
+                                          .white, // Set background color to white
+                                    ),
                                   ),
                                 ),
                               ),
-                            ),
-                            Spacer(),
-                            Padding(
-                              padding: EdgeInsets.only(right: 10),
-                              child: IconButton(
-                                icon: Icon(Icons.send_rounded, color: Colors.lightBlueAccent, size: 30,),
-                                onPressed: () {
-                                  _sendMessage(resolvedUserId, widget.contactId, _messageController.text);
-                                  sendChat();
-                                  _messageController.clear();
-                                },
+                              Padding(
+                                padding: EdgeInsets.only(right: 10),
+                                child: IconButton(
+                                  icon: Icon(
+                                    Icons.send_rounded,
+                                    color: Colors.lightBlueAccent,
+                                    size: 30,
+                                  ),
+                                  onPressed: () {
+                                    _sendMessage(
+                                        resolvedUserId,
+                                        widget.contactId,
+                                        _messageController.text);
+                                    _messageController.clear();
+                                  },
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                  );
-                }
-              },
-            );
-          }
-        },
+                      ],
+                    );
+                  },
+                );
+              }
+            },
+          ),
+          if (_showGoDownButton)
+            Positioned(
+              bottom: 20,
+              left: MediaQuery.of(context).size.width / 2 -
+                  28, // Center the button
+              child: FloatingActionButton(
+                backgroundColor: Colors.lightBlueAccent,
+                shape: CircleBorder(), // Make the button circular
+                onPressed: _scrollToBottom,
+                child: Icon(
+                  Icons.arrow_downward,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+        ],
       ),
-
     );
   }
 }

@@ -2,12 +2,15 @@ import 'dart:convert';
 
 import 'package:Doune/BackEnd/GetInfoUser.dart';
 import 'package:Doune/BackEnd/VideoAPIHandle.dart';
+import 'package:Doune/Screen/SettingScreen.dart';
+import 'package:Doune/Screen/NotFoundUserScreen.dart';
 import 'package:Doune/Screen/StoryPlayerScreen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:lottie/lottie.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:Doune/Widget/TractSheet.dart';
 
 class OtherUserScreen extends StatefulWidget {
   final int UserId;
@@ -31,11 +34,59 @@ class _OtherUserScreenState extends State<OtherUserScreen> {
   int? userId;
   bool _isFollowing = false;
   bool? Verified;
+  String _selectedTab = "Featured"; // Track selected tab
 
   @override
   void initState() {
     super.initState();
-    _fetchUserInfo();
+    _checkIfUserBlocked();
+  }
+
+  Future<void> _checkIfUserBlocked() async {
+    // Call the async function and wait for the result
+    bool blocked = await isUserBlocked();
+
+    if (blocked) {
+      // Navigate to NotFoundUserScreen if blocked
+      Navigator.of(context).pushReplacement(
+        MaterialPageRoute(builder: (context) => NotFoundUserScreen()),
+      );
+    } else {
+      // If not blocked, fetch user info
+      _fetchUserInfo();
+    }
+  }
+
+  Future<bool> isUserBlocked() async {
+    final String baseUrl = 'http://10.0.2.2:5000';
+    final currentUserId =
+        await UserInfoProvider().getUserID(); // Ensure this is awaited
+
+    // Kiểm tra xem currentUserId có null hay không
+    if (currentUserId == null) {
+      return false; // Nếu chưa đăng nhập, trả về false
+    }
+
+    // Yêu cầu đầu tiên
+    final response = await http.get(
+        Uri.parse('$baseUrl/check_blocked/$currentUserId/${widget.UserId}'));
+
+    // Yêu cầu thứ hai
+    final responseOther = await http.get(
+        Uri.parse('$baseUrl/check_blocked/${widget.UserId}/$currentUserId'));
+
+    // Kiểm tra phản hồi
+    if (response.statusCode == 200) {
+      final Map<String, dynamic> data = json.decode(response.body);
+      print('Check Blocked Response: $data'); // In phản hồi
+      return data['is_blocked'] == true; // Trả về true nếu bị chặn
+    } else if (responseOther.statusCode == 200) {
+      final Map<String, dynamic> dataOther = json.decode(responseOther.body);
+      print('Check Blocked Response (other): $dataOther'); // In phản hồi khác
+      return dataOther['is_blocked'] == true; // Trả về true nếu bị chặn
+    } else {
+      throw Exception('Failed to check if user is blocked');
+    }
   }
 
   void _showLottieAnimation() {
@@ -238,6 +289,14 @@ class _OtherUserScreenState extends State<OtherUserScreen> {
 
       // Check if the required fields are present
       if (userInfo is Map<String, dynamic>) {
+        // Check if the user is banned
+        if (userInfo['isBanned'] == true) {
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (context) => NotFoundUserScreen()),
+          );
+          return; // Exit the method
+        }
+
         setState(() {
           // Safe type conversion
           fullName = userInfo['FullName']?.toString() ?? 'No full name';
@@ -415,6 +474,28 @@ class _OtherUserScreenState extends State<OtherUserScreen> {
               ),
           ],
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(
+              Icons.more_horiz_rounded,
+              size: 24,
+              color: Colors.black,
+            ),
+            onPressed: () {
+              // Show TractSheet as a bottom sheet
+              showModalBottomSheet(
+                context: context,
+                isScrollControlled: true,
+                builder: (BuildContext context) {
+                  return TractSheet(
+                    userId: widget.UserId,
+                  );
+                },
+              );
+            },
+          ),
+          const SizedBox(width: 24),
+        ],
       ),
       body: SafeArea(
         child: RefreshIndicator(
@@ -638,6 +719,21 @@ class _OtherUserScreenState extends State<OtherUserScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
+        Container(
+          padding: const EdgeInsets.all(0), // Padding inside the circle
+          decoration: BoxDecoration(
+            shape: BoxShape.rectangle,
+          ),
+          child: IconButton(
+            onPressed: () {},
+            icon: const Icon(Icons.send_rounded, color: Colors.blueAccent),
+            tooltip: 'Message',
+            iconSize: 30, // Adjust icon size if needed
+          ),
+        ),
+        SizedBox(
+          width: 10,
+        ),
         ElevatedButton(
           onPressed: () {
             if (_isFollowing) {
@@ -647,7 +743,7 @@ class _OtherUserScreenState extends State<OtherUserScreen> {
             }
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey[250],
+            backgroundColor: Colors.lightBlueAccent,
             minimumSize: const Size(120, 45),
             elevation: 8,
             shadowColor: Colors.green.withOpacity(0.3),
@@ -659,7 +755,7 @@ class _OtherUserScreenState extends State<OtherUserScreen> {
             _isFollowing ? 'Following' : 'Follow',
             style: const TextStyle(
               fontWeight: FontWeight.w600,
-              color: Colors.black,
+              color: Colors.white,
             ),
           ),
         ),
@@ -677,7 +773,7 @@ class _OtherUserScreenState extends State<OtherUserScreen> {
             });
           },
           style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.grey[250],
+            backgroundColor: Colors.blueAccent,
             minimumSize: const Size(120, 45),
             elevation: 8,
             shadowColor: Colors.grey.withOpacity(0.3),
@@ -689,7 +785,7 @@ class _OtherUserScreenState extends State<OtherUserScreen> {
             userName != null ? '@$userName' : 'Loading...',
             style: const TextStyle(
               fontWeight: FontWeight.w600,
-              color: Colors.black,
+              color: Colors.white,
             ),
           ),
         ),
@@ -700,31 +796,100 @@ class _OtherUserScreenState extends State<OtherUserScreen> {
   Row _buildTabBar() {
     return Row(
       mainAxisAlignment: MainAxisAlignment.start,
-      children: const [
-        Text(
-          "Featured",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-            color: Colors.black,
+      children: [
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedTab = "Featured";
+            });
+          },
+          child: AnimatedContainer(
+            duration: Duration(milliseconds: 300),
+            padding: EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: _selectedTab == "Featured"
+                      ? Colors.redAccent
+                      : Colors.transparent,
+                  width: 2,
+                ),
+              ),
+            ),
+            child: Text(
+              "Featured",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: _selectedTab == "Featured"
+                    ? Colors.lightBlueAccent
+                    : Colors.grey,
+              ),
+            ),
           ),
         ),
-        SizedBox(width: 24),
-        Text(
-          "Story",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-            color: Colors.grey,
+        const SizedBox(width: 24),
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedTab = "Story";
+            });
+          },
+          child: AnimatedContainer(
+            duration: Duration(milliseconds: 300),
+            padding: EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: _selectedTab == "Story"
+                      ? Colors.redAccent
+                      : Colors.transparent,
+                  width: 2,
+                ),
+              ),
+            ),
+            child: Text(
+              "Story",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: _selectedTab == "Story"
+                    ? Colors.lightBlueAccent
+                    : Colors.grey,
+              ),
+            ),
           ),
         ),
-        SizedBox(width: 24),
-        Text(
-          "Tagged",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-            color: Colors.grey,
+        const SizedBox(width: 24),
+        GestureDetector(
+          onTap: () {
+            setState(() {
+              _selectedTab = "Tagged";
+            });
+          },
+          child: AnimatedContainer(
+            duration: Duration(milliseconds: 300),
+            padding: EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              border: Border(
+                bottom: BorderSide(
+                  color: _selectedTab == "Tagged"
+                      ? Colors.redAccent
+                      : Colors.transparent,
+                  width: 2,
+                ),
+              ),
+            ),
+            child: Text(
+              "Tagged",
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: _selectedTab == "Tagged"
+                    ? Colors.lightBlueAccent
+                    : Colors.grey,
+              ),
+            ),
           ),
         ),
         Spacer(),
@@ -744,8 +909,15 @@ class _OtherUserScreenState extends State<OtherUserScreen> {
       );
     }
 
+    Future<List<FileItem>> futureVideos;
+    if (_selectedTab == "Featured") {
+      futureVideos = userVideoList.fetchUserVideoFeatured(userId!);
+    } else {
+      futureVideos = userVideoList.fetchUserVideos(userId!);
+    }
+
     return FutureBuilder<List<FileItem>>(
-      future: userVideoList.fetchUserVideos(userId!),
+      future: futureVideos,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return Center(
@@ -784,8 +956,9 @@ class _OtherUserScreenState extends State<OtherUserScreen> {
                       context,
                       MaterialPageRoute(
                         builder: (context) => MediaDisplayScreen(
-                          url: video.url,
-                          type: video.type,
+                          videos: videos,
+                          initialIndex: index,
+                          user: false,
                         ),
                       ),
                     );
@@ -797,8 +970,8 @@ class _OtherUserScreenState extends State<OtherUserScreen> {
                         decoration: BoxDecoration(
                           border: Border.all(
                             color: video.type == 'video'
-                                ? Colors.redAccent
-                                : Colors.blueAccent,
+                                ? Colors.lightBlueAccent
+                                : Colors.redAccent,
                             width: 3.0,
                           ),
                           borderRadius: BorderRadius.circular(12),
@@ -809,23 +982,26 @@ class _OtherUserScreenState extends State<OtherUserScreen> {
                             width: double.infinity,
                             height: double.infinity,
                             child: video.type == 'video'
-                                ? Container(
-                                    color: Colors.black,
-                                    child: Center(
-                                      child: Icon(
-                                        Icons.play_circle_outline,
-                                        color: Colors.white,
-                                        size: 50.0,
-                                      ),
-                                    ),
+                                ? Image.network(
+                                    video.thumbnailUrl,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      print('Error loading thumbnail: $error');
+                                      return Image.network(
+                                        'https://example.com/placeholder.png',
+                                        fit: BoxFit.cover,
+                                      );
+                                    },
                                   )
                                 : Image.network(
                                     video.url,
                                     fit: BoxFit.cover,
                                     errorBuilder: (context, error, stackTrace) {
+                                      print('Error loading image: $error');
                                       return Image.network(
-                                          'https://example.com/placeholder.png',
-                                          fit: BoxFit.cover);
+                                        'https://example.com/placeholder.png',
+                                        fit: BoxFit.cover,
+                                      );
                                     },
                                   ),
                           ),

@@ -10,6 +10,7 @@ class Users {
   final String bio;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String updatedAtUsername;  // Thêm thuộc tính này
   final int follower;
   final int following;
   final int point;
@@ -27,10 +28,11 @@ class Users {
     required this.bio,
     required this.createdAt,
     required this.updatedAt,
+    required this.updatedAtUsername,  // Thêm vào đây
     required this.follower,
     required this.following,
     required this.point,
-    required this.verified, // Change to bool
+    required this.verified,
   });
 
   factory Users.fromJson(Map<String, dynamic> json) {
@@ -46,10 +48,11 @@ class Users {
       bio: json["Bio"] ?? '',
       createdAt: DateTime.tryParse(json["CreatedAt"] ?? '') ?? DateTime.now(),
       updatedAt: DateTime.tryParse(json["UpdatedAt"] ?? '') ?? DateTime.now(),
+      updatedAtUsername: json["UpdatedAtUsername"] ?? '',  // Thêm vào đây
       follower: json["Follower"] ?? 0,
       following: json["Following"] ?? 0,
       point: json["Point"] ?? 0,
-      verified: json["Verified"] ?? false, // Handle boolean values
+      verified: json["Verified"] ?? false,
     );
   }
 
@@ -65,14 +68,15 @@ class Users {
     "Bio": bio,
     "CreatedAt": createdAt.toIso8601String(),
     "UpdatedAt": updatedAt.toIso8601String(),
+    "UpdatedAtUsername": updatedAtUsername,  // Thêm vào đây
     "Follower": follower,
     "Following": following,
     "Point": point,
-    "Verified": verified, // Serialize as boolean
+    "Verified": verified,
   };
 
   @override
   String toString() {
-    return 'Users{userID: $userID, username: $username, email: $email, fullName: $fullName, dateOfBirth: $dateOfBirth, gender: $gender, bio: $bio, createdAt: $createdAt, updatedAt: $updatedAt, follower: $follower, following: $following, point: $point, verified: $verified}';
+    return 'Users{userID: $userID, username: $username, email: $email, fullName: $fullName, dateOfBirth: $dateOfBirth, gender: $gender, bio: $bio, createdAt: $createdAt, updatedAt: $updatedAt, updatedAtUsername: $updatedAtUsername, follower: $follower, following: $following, point: $point, verified: $verified}';
   }
 }

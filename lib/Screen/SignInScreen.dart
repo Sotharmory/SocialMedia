@@ -1,5 +1,8 @@
+import 'dart:convert';
+
 import 'package:Doune/BackEnd/GetInfoUser.dart';
 import 'package:Doune/BackEnd/SignInBackEnd.dart'; // Import your SignInBackEnd class
+import 'package:Doune/Screen/BannedScreen.dart';
 import 'package:Doune/Screen/ForgotPasswordScreen.dart';
 import 'package:Doune/Screen/MenuPage.dart';
 import 'package:Doune/Screen/SignUpScreen.dart';
@@ -7,6 +10,7 @@ import 'package:Doune/Utils/Snackbar.dart';
 import 'package:Doune/Utils/colors.dart';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:http/http.dart' as http;
 
 class SignInScreen extends StatefulWidget {
   @override
@@ -27,13 +31,33 @@ class _SignInScreenState extends State<SignInScreen> {
     });
   }
 
+  Future<bool> checkIfBanned(int userId) async {
+    final response = await http.get(Uri.parse('http://10.0.2.2:5000/check_ban/$userId'));
+
+    if (response.statusCode == 200) {
+      final data = jsonDecode(response.body);
+      return data['is_banned'] == true;
+    } else {
+      throw Exception('Failed to check ban status');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     Size size = MediaQuery.of(context).size;
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: Text("Sign In"),
+        backgroundColor: Colors.lightBlueAccent,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () {
+            Navigator.pop(context); // Quay về trang trước
+          },
+        ),
+        title: Text(
+          "Sign In",
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
       ),
       body: Container(
         decoration: BoxDecoration(
@@ -94,48 +118,55 @@ class _SignInScreenState extends State<SignInScreen> {
                     ),
                   ),
                   SizedBox(height: size.height * 0.04),
-                  GestureDetector(
-                    onTap: () async {
-                      String email = _emailController.text.trim();
-                      String password = _passwordController.text.trim();
+              GestureDetector(
+                  onTap: () async {
+                    String email = _emailController.text.trim();
+                    String password = _passwordController.text.trim();
 
-                      // Validate email and password
-                      String? emailError = _signInBackEnd.validateEmail(email);
-                      String? passwordError = _signInBackEnd.validatePassword(password);
+                    // Validate email and password
+                    String? emailError = _signInBackEnd.validateEmail(email);
+                    String? passwordError = _signInBackEnd.validatePassword(password);
 
-                      if (emailError != null) {
-                        // Show error message for email
-                        showErrorSnackbar(context, emailError);
-                        return;
-                      }
+                    if (emailError != null) {
+                      showErrorSnackbar(context, emailError);
+                      return;
+                    }
 
-                      if (passwordError != null) {
-                        // Show error message for password
-                        showErrorSnackbar(context, passwordError);
-                        return;
-                      }
-                      bool success = await _signInBackEnd.signIn(email, password);
-                      if (success) {
-                        final prefs = await SharedPreferences.getInstance();
-                        await prefs.setBool('isSignedIn', true);
-                        final userInfo = await userInfoProvider.getUserInfo(email);
-                        if (userInfo != null && userInfo.containsKey('UserID')) {
-                          final userId = userInfo['UserID'];
-                          print('test $userId');
-                          if (userId != null) {
-                            await userInfoProvider.saveUserID(userId);
+                    if (passwordError != null) {
+                      showErrorSnackbar(context, passwordError);
+                      return;
+                    }
+
+                    bool success = await _signInBackEnd.signIn(email, password);
+                    if (success) {
+                      final userInfo = await userInfoProvider.getUserInfo(email);
+                      if (userInfo != null && userInfo.containsKey('UserID')) {
+                        final userId = userInfo['UserID'];
+                          // Check if the user is banned
+                          bool isBanned = await checkIfBanned(userId);
+                          if (isBanned) {
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(builder: (context) => BannedScreen(userId: userId,)),
+                            );
+                          } else {
+                            final prefs = await SharedPreferences.getInstance();
+                            await prefs.setBool('isSignedIn', true);
+                            if (userId != null) {
+                              // Save user ID locally
+                              await userInfoProvider.saveUserID(userId);
+                            Navigator.pushReplacement(
+                              context,
+                              MaterialPageRoute(builder: (context) => HomePage(isSignedIn: true)),
+                            );
                           }
                         }
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (context) => HomePage(isSignedIn: true)),
-                        );
                       }
-                      else {
-                        String invalidMessageSignIn = "Email or password is incorrect!";
-                        showErrorSnackbar(context, invalidMessageSignIn);
-                      }
-                    },
+                    } else {
+                      String invalidMessageSignIn = "Email or password is incorrect!";
+                      showErrorSnackbar(context, invalidMessageSignIn);
+                    }
+                  },
                     child: Container(
                       width: size.width,
                       padding: const EdgeInsets.symmetric(vertical: 20),

@@ -8,6 +8,7 @@ class UserInfo {
   final String fullName;
   final String username;
   final String profilePicture;
+  final bool verified; // New field for verified status
 
   UserInfo({
     required this.userId,
@@ -15,15 +16,18 @@ class UserInfo {
     required this.fullName,
     required this.username,
     required this.profilePicture,
+    required this.verified, // Initialize new field
   });
 
   factory UserInfo.fromJson(Map<String, dynamic> json) {
+    print('UserInfo JSON: $json'); // Debugging output
     return UserInfo(
       userId: json['UserID'] ?? 0,
       email: json['Email'] ?? '',
       fullName: json['FullName'] ?? '',
       username: json['Username'] ?? '',
       profilePicture: json['ProfilePicture'] ?? '',
+      verified: json['Verified'] ?? false, // Parse verified status
     );
   }
 }
@@ -32,34 +36,55 @@ class UserInfo {
 class FileItem {
   final String fileId;
   final String filename;
-  final String url;
-  final String type;
-  final UserInfo userInfo;
-  final int views;
   final int reactions;
   final int shares;
+  final String status;
+  final String type;
+  final String url;
+  final String thumbnailUrl;
+  final int views;
+  final String thumbnailId;
+  final bool featured;
+  final bool private; // New field for private status
 
   FileItem({
     required this.fileId,
     required this.filename,
-    required this.url,
-    required this.type,
-    required this.userInfo,
-    required this.views,
     required this.reactions,
     required this.shares,
+    required this.status,
+    required this.type,
+    required this.url,
+    required this.thumbnailUrl,
+    required this.views,
+    required this.thumbnailId,
+    required this.featured,
+    required this.private, // Initialize new field
   });
 
   factory FileItem.fromJson(Map<String, dynamic> json) {
+    print('FileItem JSON: $json'); // Debugging output
+
+    final thumbnailUrl = json['thumbnail_url'] ??
+        'https://example.com/placeholder.png'; // Default placeholder URL
+    print('Thumbnail URL: $thumbnailUrl'); // Print thumbnail URL
+
+    final metadata = json['metadata'] ?? {}; // Ensure metadata is not null
+    final thumbnailId = metadata['thumbnail_id'] ?? ''; // Parse thumbnail ID
+
     return FileItem(
-      fileId: json['file_id'] ?? '',
-      filename: json['filename'] ?? '',
-      url: json['url'] ?? '',
-      type: json['type'] ?? 'unknown',
-      userInfo: UserInfo.fromJson(json['user_info'] ?? {}),
-      views: json['views'] ?? 0,
+      fileId: json['file_id'],
+      filename: json['filename'],
       reactions: json['reactions'] ?? 0,
       shares: json['shares'] ?? 0,
+      status: json['status'],
+      type: json['type'],
+      url: json['url'],
+      thumbnailUrl: thumbnailUrl,
+      views: json['views'] ?? 0,
+      thumbnailId: thumbnailId,
+      featured: json['featured'] ?? false,
+      private: json['private'] ?? false, // Parse private status
     );
   }
 }
@@ -69,57 +94,57 @@ class UserVideoList {
   final String baseUrl = 'http://10.0.2.2:5000'; // Update with your server URL
 
   Future<List<FileItem>> fetchUserVideos(int userId) async {
-    final response = await http.get(Uri.parse('$baseUrl/user-videos?user_ids=$userId'));
+    final url = '$baseUrl/user-videos?user_ids=$userId&include_thumbnails=true';
+    print('Fetching user videos from URL: $url'); // Debugging output
 
-    if (response.statusCode == 200) {
+    try {
+      final response = await http.get(Uri.parse(url));
+      _checkResponse(response);
+
       List<dynamic> data = json.decode(response.body) as List<dynamic>;
-      print('Raw JSON data: $data'); // Print the raw JSON data
+      return data.map<FileItem>((video) => FileItem.fromJson(video)).toList();
+    } catch (e) {
+      print('Error fetching user videos: $e');
+      return [];
+    }
+  }
 
-      return data.map((video) {
-        if (video == null || video is! Map<String, dynamic>) {
-          print('Error: video item is null or not a Map');
-          return FileItem(
-            fileId: '',
-            filename: '',
-            url: '',
-            type: 'unknown',
-            userInfo: UserInfo(
-              userId: 0,
-              email: '',
-              fullName: '',
-              username: '',
-              profilePicture: '',
-            ),
-            views: 0,
-            reactions: 0,
-            shares: 0,
-          );
-        }
+  Future<List<FileItem>> VideoFeatured(int userId) async {
+    final url = '$baseUrl/videofeatured?user_id=$userId';
+    print('Fetching featured user videos from URL: $url'); // Debugging output
 
-        try {
-          return FileItem.fromJson(video);
-        } catch (e) {
-          print('Error parsing video item: $e');
-          return FileItem(
-            fileId: '',
-            filename: '',
-            url: '',
-            type: 'unknown',
-            userInfo: UserInfo(
-              userId: 0,
-              email: '',
-              fullName: '',
-              username: '',
-              profilePicture: '',
-            ),
-            views: 0,
-            reactions: 0,
-            shares: 0,
-          );
-        }
-      }).toList();
-    } else {
-      throw Exception('Failed to load videos with status code ${response.statusCode}');
+    try {
+      final response = await http.get(Uri.parse(url));
+      _checkResponse(response);
+
+      List<dynamic> data = json.decode(response.body) as List<dynamic>;
+      return data.map<FileItem>((video) => FileItem.fromJson(video)).toList();
+    } catch (e) {
+      print('Error fetching featured user videos: $e');
+      return [];
+    }
+  }
+
+  Future<List<FileItem>> fetchUserVideoFeatured(int userId) async {
+    final url = '$baseUrl/getuservideofeatured?user_id=$userId';
+    print('Fetching featured user videos from URL: $url'); // Debugging output
+
+    try {
+      final response = await http.get(Uri.parse(url));
+      _checkResponse(response);
+
+      List<dynamic> data = json.decode(response.body) as List<dynamic>;
+      return data.map<FileItem>((video) => FileItem.fromJson(video)).toList();
+    } catch (e) {
+      print('Error fetching featured user videos: $e');
+      return [];
+    }
+  }
+
+  void _checkResponse(http.Response response) {
+    if (response.statusCode != 200) {
+      print('Failed to load: ${response.body}'); // Print response body on error
+      throw Exception('Failed with status code ${response.statusCode}');
     }
   }
 }
@@ -129,74 +154,48 @@ class VideoAPIHandle {
   final String baseUrl = 'http://10.0.2.2:5000';
 
   Future<List<FileItem>> fetchFiles(int offset, int limit) async {
+    final url = '$baseUrl/files?offset=$offset&limit=$limit';
+    print('Fetching files from URL: $url'); // Debugging output
+
     try {
-      final response = await http.get(Uri.parse('$baseUrl/files?offset=$offset&limit=$limit'));
+      final response = await http.get(Uri.parse(url));
+      _checkResponse(response);
 
-      if (response.statusCode == 200) {
-        if (response.headers['content-type']?.contains('application/json') ?? false) {
-          List<dynamic> data = json.decode(response.body) as List<dynamic>;
-          List<FileItem> fileItems = [];
-          Set<String> processedFileIds = {}; // Track processed file IDs
-
-          for (var json in data) {
-            try {
-              FileItem fileItem = FileItem.fromJson(json as Map<String, dynamic>);
-              fileItems.add(fileItem);
-
-              // Increment the view count if not already processed
-              if (!processedFileIds.contains(fileItem.fileId)) {
-                processedFileIds.add(fileItem.fileId);
-              }
-
-            } catch (e) {
-              print('Error parsing file item: $e');
-              fileItems.add(FileItem(
-                fileId: '',
-                filename: '',
-                url: '',
-                type: 'unknown',
-                userInfo: UserInfo(
-                  userId: 0,
-                  email: '',
-                  fullName: '',
-                  username: '',
-                  profilePicture: '',
-                ),
-                views: 0,
-                reactions: 0,
-                shares: 0,
-              ));
-            }
-          }
-
-          return fileItems;
-        } else {
-          throw Exception('Unexpected content type: ${response.headers['content-type']}');
-        }
-      } else {
-        throw Exception('Failed to load files with status code ${response.statusCode}');
-      }
+      List<dynamic> data = json.decode(response.body) as List<dynamic>;
+      return data.map<FileItem>((json) => FileItem.fromJson(json)).toList();
     } catch (e) {
-      print('Error: $e');
+      print('Error fetching files: $e');
       return [];
     }
   }
 
   Future<void> incrementViewCount(String fileId) async {
+    final url = '$baseUrl/video/$fileId/view';
+    print('Incrementing view count for file ID: $fileId'); // Debugging output
+
     try {
       final response = await http.post(
-        Uri.parse('$baseUrl/video/$fileId/view'),
+        Uri.parse(url),
         headers: {'Content-Type': 'application/json'},
-        body: json.encode({'fileId': fileId}), // Sending fileId in the body for reference
+        body: json.encode({'fileId': fileId}),
       );
 
-      if (response.statusCode == 200) {
-        print('View count updated successfully for file $fileId.');
-      } else {
-        throw Exception('Failed to update view count for file $fileId with status code ${response.statusCode}');
+      if (response.statusCode != 200) {
+        print(
+            'Failed to update view count: ${response.body}'); // Debugging output
+        throw Exception(
+            'Failed to update view count with status code ${response.statusCode}');
       }
+      print('View count updated successfully for file $fileId.');
     } catch (e) {
-      print('Error: $e');
+      print('Error incrementing view count: $e');
+    }
+  }
+
+  void _checkResponse(http.Response response) {
+    if (response.statusCode != 200) {
+      print('Failed to load: ${response.body}'); // Print response body on error
+      throw Exception('Failed with status code ${response.statusCode}');
     }
   }
 }

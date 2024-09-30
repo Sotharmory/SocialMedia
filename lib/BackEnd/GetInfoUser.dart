@@ -3,15 +3,12 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 
-
-
 class UserInfoProvider with ChangeNotifier {
   final String baseUrl = "http://10.0.2.2:5000"; // Your API base URL
 
   String? _profilePictureUrl;
 
   String? get profilePictureUrl => _profilePictureUrl;
-
 
   Future<Map<String, dynamic>?> getUserInfoById(int userId) async {
     final response = await http.get(Uri.parse('${baseUrl}/user-by-id/$userId'));
@@ -25,8 +22,47 @@ class UserInfoProvider with ChangeNotifier {
   Future<void> fetchAndUpdateUserInfo(String email) async {
     final userInfo = await getUserInfo(email);
     if (userInfo != null) {
-      _profilePictureUrl = userInfo['profile_picture_url'];
+      _profilePictureUrl =
+          'http://10.0.2.2:5000/download/avatar/${userInfo['ProfilePictureURL']}';
       notifyListeners();
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchFollowers(int userId) async {
+    final response = await http.get(Uri.parse('${baseUrl}/followers/$userId'));
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data
+          .map((follower) => {
+                'user_id': follower['user_id'],
+                'username': follower['username'],
+                'full_name': follower['full_name'],
+                'profile_picture':
+                    'http://10.0.2.2:5000/download/avatar/${follower['profile_picture']}'
+              })
+          .toList();
+    } else {
+      throw Exception('Failed to load followers');
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> fetchFollowing(int userId) async {
+    final response = await http.get(Uri.parse('${baseUrl}/following/$userId'));
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data
+          .map((following) => {
+                'user_id': following['user_id'],
+                'username': following['username'],
+                'full_name': following['full_name'],
+                'profile_picture':
+                    'http://10.0.2.2:5000/download/avatar/${following['profile_picture']}'
+              })
+          .toList();
+    } else {
+      throw Exception('Failed to load following');
     }
   }
 
