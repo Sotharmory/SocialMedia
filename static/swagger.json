@@ -1,0 +1,1734 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "version": "1.0.0",
+    "title": "Doune API",
+    "description": "API documentation for the Doune application."
+  },
+  "tags": [
+    {
+      "name": "Reports",
+      "description": "APIs for reporting users and media"
+    },
+    {
+      "name": "User",
+      "description": "Operations related to users"
+    },
+    {
+      "name": "File",
+      "description": "Operations related to file uploads and management"
+    },
+    {
+      "name": "Authentication",
+      "description": "Operations related to user authentication and account management"
+    },
+    {
+      "name": "Message",
+      "description": "Operations related to messaging and conversations"
+    }
+  ],
+  "paths": {
+    "/signup": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Sign up a new user",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "Email": {
+                  "type": "string"
+                },
+                "Password": {
+                  "type": "string"
+                },
+                "DateOfBirth": {
+                  "type": "string",
+                  "format": "date"
+                }
+              },
+              "required": [
+                "Email",
+                "Password",
+                "DateOfBirth"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "User created successfully"
+          },
+          "400": {
+            "description": "Invalid input"
+          }
+        }
+      }
+    },
+    "/getuservideofeatured": {
+      "get": {
+        "summary": "Get User Featured Videos",
+        "description": "Fetches videos for a given user that have the `featured` metadata set to `True`.",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            },
+            "description": "The ID of the user whose featured videos are to be fetched."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of featured videos for the user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "user_info": {
+                        "type": "object",
+                        "properties": {
+                          "UserId": {
+                            "type": "integer"
+                          },
+                          "Email": {
+                            "type": "string"
+                          },
+                          "FullName": {
+                            "type": "string"
+                          },
+                          "Username": {
+                            "type": "string"
+                          },
+                          "ProfilePicture": {
+                            "type": "string"
+                          },
+                          "Verified": {
+                            "type": "boolean"
+                          }
+                        }
+                      },
+                      "file_id": {
+                        "type": "string"
+                      },
+                      "filename": {
+                        "type": "string"
+                      },
+                      "url": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "reactions": {
+                        "type": "integer"
+                      },
+                      "shares": {
+                        "type": "integer"
+                      },
+                      "views": {
+                        "type": "integer"
+                      },
+                      "thumbnail_url": {
+                        "type": "string"
+                      },
+                      "featured": {
+                        "type": "boolean"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "User ID is required."
+          },
+          "404": {
+            "description": "No featured videos found for the user."
+          }
+        }
+      }
+    },
+    "/updatefeatured": {
+      "post": {
+        "summary": "Update Featured Status of a Video",
+        "description": "Toggles the `featured` status of a video.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file_id": {
+                    "type": "string",
+                    "description": "The ID of the video file to update the featured status."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Featured status updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    },
+                    "featured": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "File ID is required or invalid file_id format."
+          },
+          "404": {
+            "description": "Video not found."
+          }
+        }
+      }
+    },
+    "/report_user": {
+      "post": {
+        "tags": ["Reports"],
+        "summary": "Report a user",
+        "description": "Report a user for inappropriate behavior",
+        "operationId": "reportUser",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "description": "User ID and reason for reporting",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "user_id": {
+                  "type": "integer",
+                  "example": 1
+                },
+                "reason": {
+                  "type": "string",
+                  "example": "Inappropriate behavior"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "User reported successfully"
+          },
+          "400": {
+            "description": "User ID and reason are required"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/report_media": {
+      "post": {
+        "tags": ["Reports"],
+        "summary": "Report media",
+        "description": "Report media for inappropriate content",
+        "operationId": "reportMedia",
+        "consumes": ["application/json"],
+        "produces": ["application/json"],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "description": "Media ID and reason for reporting",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "media_id": {
+                  "type": "string",
+                  "example": "60c72b2f9b1d4c3d88f9b2f1"
+                },
+                "reason": {
+                  "type": "string",
+                  "example": "Inappropriate content"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Media reported successfully"
+          },
+          "400": {
+            "description": "Media ID and reason are required"
+          },
+          "404": {
+            "description": "Media not found"
+          }
+        }
+      }
+    },
+    "/api/support-request": {
+      "post": {
+        "summary": "Submit support request",
+        "description": "Save user support request information.",
+        "parameters": [
+          {
+            "name": "FullName",
+            "in": "formData",
+            "required": true,
+            "type": "string",
+            "example": "John Doe"
+          },
+          {
+            "name": "Email",
+            "in": "formData",
+            "required": true,
+            "type": "string",
+            "example": "johndoe@example.com"
+          },
+          {
+            "name": "Message",
+            "in": "formData",
+            "required": true,
+            "type": "string",
+            "example": "I need support with my product."
+          },
+          {
+            "name": "Image",
+            "in": "formData",
+            "required": false,
+            "type": "file"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Support request saved successfully."
+          },
+          "400": {
+            "description": "Missing information."
+          }
+        }
+      }
+    },
+    "/signin": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Sign in an existing user",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "Email": {
+                  "type": "string"
+                },
+                "Password": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "Email",
+                "Password"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User signed in successfully"
+          },
+          "401": {
+            "description": "Invalid email or password"
+          }
+        }
+      }
+    },
+    "/user/{username}": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Get user information by username",
+        "parameters": [
+          {
+            "name": "username",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User information",
+            "schema": {
+              "$ref": "#/definitions/User"
+            }
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/checkreaction": {
+      "get": {
+        "summary": "Check if a user has liked a video",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Reaction status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "liked": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/react": {
+      "post": {
+        "summary": "Like a video",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file_id": {
+                    "type": "string",
+                    "example": "66cdea61ac21faabc8986919"
+                  },
+                  "user_id": {
+                    "type": "integer",
+                    "example": 123
+                  }
+                },
+                "required": ["file_id", "user_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successfully liked the video",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Already liked the video",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/unreact": {
+      "post": {
+        "summary": "Dislike a video",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file_id": {
+                    "type": "string",
+                    "example": "66cdea61ac21faabc8986919"
+                  },
+                  "user_id": {
+                    "type": "integer",
+                    "example": 123
+                  }
+                },
+                "required": ["file_id", "user_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successfully unliked the video",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Not liked the video",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/checkemail": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Check if an email exists",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "email"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Email existence check successful",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "exists": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Email parameter is missing"
+          }
+        }
+      }
+    },
+
+    "/upload": {
+      "post": {
+        "tags": [
+          "File"
+        ],
+        "summary": "Upload a video file with optional thumbnail",
+        "consumes": [
+          "multipart/form-data"
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "formData",
+            "required": true,
+            "type": "integer",
+            "description": "ID of the user uploading the video"
+          },
+          {
+            "name": "file",
+            "in": "formData",
+            "required": true,
+            "type": "file",
+            "description": "The video file to upload"
+          },
+          {
+            "name": "thumbnail",
+            "in": "formData",
+            "required": false,
+            "type": "file",
+            "description": "Optional thumbnail image for the video"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Video uploaded successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "Video uploaded successfully and approved."
+                },
+                "video_id": {
+                  "type": "string",
+                  "example": "60d5f7d41c4a4f65d70d8f28"
+                },
+                "user_info": {
+                  "type": "object",
+                  "properties": {
+                    "UserId": {
+                      "type": "integer",
+                      "example": 12345
+                    },
+                    "FullName": {
+                      "type": "string",
+                      "example": "John Doe"
+                    },
+                    "Username": {
+                      "type": "string",
+                      "example": "johndoe"
+                    },
+                    "ProfilePicture": {
+                      "type": "string",
+                      "example": "/path/to/profile.jpg"
+                    },
+                    "Verified": {
+                      "type": "boolean",
+                      "example": true
+                    }
+                  }
+                },
+                "status": {
+                  "type": "string",
+                  "enum": ["approved", "under review"],
+                  "example": "approved"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "No file part in the request or user ID is required."
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "User not found"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal server error",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string",
+                  "example": "Error processing the file: [error details]"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/upload-avatar": {
+      "post": {
+        "tags": [
+          "File"
+        ],
+        "summary": "Upload a user's avatar",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "formData",
+            "required": true,
+            "type": "integer",
+            "description": "ID of the user uploading the avatar"
+          },
+          {
+            "name": "file",
+            "in": "formData",
+            "required": true,
+            "type": "file",
+            "description": "The avatar file to upload"
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Avatar uploaded successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string"
+                },
+                "profile_picture_url": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad request due to missing parameters or file"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/files": {
+      "get": {
+        "tags": [
+          "File"
+        ],
+        "summary": "List all uploaded files",
+        "responses": {
+          "200": {
+            "description": "A list of files",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/FileItem"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/download/{file_id}": {
+      "get": {
+        "tags": [
+          "File"
+        ],
+        "summary": "Download a video file",
+        "parameters": [
+          {
+            "name": "file_id",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "File downloaded successfully"
+          },
+          "404": {
+            "description": "File not found"
+          }
+        }
+      }
+    },
+    "/send-otp": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Send OTP to email",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "email"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OTP sent successfully"
+          },
+          "400": {
+            "description": "Email is required"
+          }
+        }
+      }
+    },
+    "/verify-otp": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Verify OTP",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "otp": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "email",
+                "otp"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OTP verified successfully"
+          },
+          "400": {
+            "description": "Invalid OTP"
+          }
+        }
+      }
+    },
+    "/change-password": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Change user password",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "email": {
+                  "type": "string"
+                },
+                "new_password": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "email",
+                "new_password"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Password changed successfully"
+          },
+          "400": {
+            "description": "Email and new password are required"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Get all users",
+        "responses": {
+          "200": {
+            "description": "A list of users",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/User"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/user/{email}": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Get user information by email",
+        "parameters": [
+          {
+            "name": "email",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User information",
+            "schema": {
+              "$ref": "#/definitions/User"
+            }
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/user-videos": {
+      "get": {
+        "tags": [
+          "File"
+        ],
+        "summary": "Get videos for specific users",
+        "parameters": [
+          {
+            "name": "user_ids",
+            "in": "query",
+            "required": true,
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A list of video files",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/FileItem"
+              }
+            }
+          },
+          "400": {
+            "description": "No user IDs provided"
+          }
+        }
+      }
+    },
+    "/signout": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Sign out a user",
+        "responses": {
+          "200": {
+            "description": "User signed out successfully"
+          }
+        }
+      }
+    },
+    "/follow": {
+      "post": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Follow a user",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "follower_id": {
+                  "type": "integer",
+                  "description": "ID of the user who is following"
+                },
+                "followed_id": {
+                  "type": "integer",
+                  "description": "ID of the user being followed"
+                }
+              },
+              "required": [
+                "follower_id",
+                "followed_id"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "User followed successfully"
+          },
+          "400": {
+            "description": "Invalid input or already following"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/unfollow": {
+      "post": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Unfollow a user",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "follower_id": {
+                  "type": "integer",
+                  "description": "ID of the user who is unfollowing"
+                },
+                "followed_id": {
+                  "type": "integer",
+                  "description": "ID of the user being unfollowed"
+                }
+              },
+              "required": [
+                "follower_id",
+                "followed_id"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User unfollowed successfully"
+          },
+          "400": {
+            "description": "Invalid input or not following"
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/followers/{user_id}": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Get a list of followers for a user",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "ID of the user whose followers are being retrieved"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of followers",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": "integer",
+                    "description": "ID of the follower"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/following/{user_id}": {
+      "get": {
+        "tags": [
+          "User"
+        ],
+        "summary": "Get a list of users being followed by a user",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "type": "integer",
+            "description": "ID of the user whose following list is being retrieved"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of users being followed",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "followed_id": {
+                    "type": "integer",
+                    "description": "ID of the user being followed"
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found"
+          }
+        }
+      }
+    },
+    "/search": {
+      "post": {
+        "summary": "Record keyword search",
+        "description": "Records a keyword search by either adding a new keyword if it hasn't been searched by the user before or not incrementing the count if it has already been searched by the user.",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "description": "Keyword and user ID to search",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "keyword": {
+                  "type": "string",
+                  "example": "example_keyword"
+                },
+                "user_email": {
+                  "type": "string",
+                  "example": "user123"
+                }
+              },
+              "required": [
+                "keyword",
+                "user_email"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Keyword search recorded successfully or already searched by this user"
+          },
+          "400": {
+            "description": "No keyword or user_id provided"
+          }
+        }
+      }
+    },
+    "/top-search": {
+      "get": {
+        "summary": "Get top searched keywords",
+        "description": "Returns a list of the top 5 keywords with the most search counts, including the user IDs who searched each keyword.",
+        "responses": {
+          "200": {
+            "description": "Top searched keywords",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "keyword": {
+                    "type": "string",
+                    "example": "popular_keyword"
+                  },
+                  "search_count": {
+                    "type": "integer",
+                    "example": 100
+                  },
+                  "user_ids": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "example": "user123"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No keywords found"
+          }
+        }
+      }
+    },
+    "/send_message": {
+      "post": {
+        "tags": [
+          "Message"
+        ],
+        "summary": "Send a message to a user",
+        "parameters": [
+          {
+            "name": "body",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "sender_id": {
+                  "type": "integer",
+                  "description": "ID of the user sending the message"
+                },
+                "receiver_id": {
+                  "type": "integer",
+                  "description": "ID of the user receiving the message"
+                },
+                "message": {
+                  "type": "string",
+                  "description": "The message text"
+                }
+              },
+              "required": [
+                "sender_id",
+                "receiver_id",
+                "message"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Message sent successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message_id": {
+                  "type": "string",
+                  "description": "Unique identifier for the message"
+                },
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time",
+                  "description": "Time when the message was sent"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input"
+          }
+        }
+      }
+    },
+    "/get_conversation": {
+      "get": {
+        "tags": [
+          "Message"
+        ],
+        "summary": "Get messages in a conversation",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "name": "contact_id",
+            "in": "query",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Conversation retrieved successfully",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "message_id": {
+                    "type": "string",
+                    "description": "Unique identifier for the message"
+                  },
+                  "from_user_id": {
+                    "type": "integer",
+                    "description": "ID of the user who sent the message"
+                  },
+                  "message": {
+                    "type": "string",
+                    "description": "The message text"
+                  },
+                  "timestamp": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "Time when the message was sent"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid query parameters"
+          }
+        }
+      }
+    },
+    "/ban/{user_id}": {
+      "post": {
+        "summary": "Ban a user",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "reason_id",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "reason_id": {
+                  "type": "integer",
+                  "example": 1
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User banned successfully",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "User banned successfully"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "User not found"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/unban/{user_id}": {
+      "post": {
+        "summary": "Unban a user",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User unbanned successfully",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "User unbanned successfully"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "User not found"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/block": {
+      "post": {
+        "summary": "Block a user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": "integer"
+                  },
+                  "blocked_user_id": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["user_id", "blocked_user_id"]
+              },
+              "example": {
+                "user_id": 1,
+                "blocked_user_id": 2
+              }
+            }
+          },
+          "responses": {
+            "201": {
+              "description": "User blocked successfully",
+              "content": {
+                "application/json": {
+                  "example": {
+                    "message": "User blocked successfully"
+                  }
+                }
+              }
+            },
+            "400": {
+              "description": "user_id and blocked_user_id are required",
+              "content": {
+                "application/json": {
+                  "example": {
+                    "message": "user_id and blocked_user_id are required"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/unblock": {
+      "post": {
+        "summary": "Unblock a user",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": "integer"
+                  },
+                  "blocked_user_id": {
+                    "type": "integer"
+                  }
+                },
+                "required": ["user_id", "blocked_user_id"]
+              },
+              "example": {
+                "user_id": 1,
+                "blocked_user_id": 2
+              }
+            }
+          },
+          "responses": {
+            "200": {
+              "description": "User unblocked successfully",
+              "content": {
+                "application/json": {
+                  "example": {
+                    "message": "User unblocked successfully"
+                  }
+                }
+              }
+            },
+            "404": {
+              "description": "Block entry not found",
+              "content": {
+                "application/json": {
+                  "example": {
+                    "message": "Block entry not found"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/check_blocked/{user_id}/{blocked_user_id}": {
+      "get": {
+        "summary": "Check if a user is blocked",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "blocked_user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Check blocked status",
+            "content": {
+              "application/json": {
+                "example": {
+                  "is_blocked": true
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/check_ban/{user_id}": {
+      "get": {
+        "summary": "Check if a user is banned",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Check banned status",
+            "content": {
+              "application/json": {
+                "example": {
+                  "is_banned": true
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found",
+            "content": {
+              "application/json": {
+                "example": {
+                  "message": "User not found"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/Get_User_Messenger_List": {
+      "get": {
+        "tags": [
+          "Message"
+        ],
+        "summary": "Get a list of users messaging with the specified user and their last message",
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User messenger list retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "contact_id": {
+                        "type": "integer",
+                        "description": "ID of the contact messaging with the user"
+                      },
+                      "last_message": {
+                        "type": "string",
+                        "description": "The last message from the contact"
+                      },
+                      "timestamp": {
+                        "type": "string",
+                        "format": "date-time",
+                        "description": "Timestamp of the last message"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Missing or invalid user_id"
+          },
+          "404": {
+            "description": "No conversations found for the user or no messages found"
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "User": {
+      "type": "object",
+      "properties": {
+        "user_id": {
+          "type": "string"
+        },
+        "email": {
+          "type": "string"
+        },
+        "username": {
+          "type": "string"
+        },
+        "full_name": {
+          "type": "string"
+        },
+        "profile_picture": {
+          "type": "string"
+        }
+      }
+    },
+    "FileItem": {
+      "type": "object",
+      "properties": {
+        "file_id": {
+          "type": "string"
+        },
+        "filename": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "reactions": {
+          "type": "integer",
+          "description": "Number of reactions to the file"
+        },
+        "shares": {
+          "type": "integer",
+          "description": "Number of shares of the file"
+        },
+        "views": {
+          "type": "integer",
+          "description": "Number of views of the file"
+        }
+      }
+    }
+  }
+}
