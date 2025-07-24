@@ -45,7 +45,7 @@ doune/
 └── README.md
 ⚙️ Getting Started
 1. Clone the Repository
-git clone https://github.com/yourusername/doune.git
+git clone git@github.com:Sotharmory/SocialMedia.git
 cd doune
 2. Install Dependencies
 flutter pub get
@@ -69,7 +69,7 @@ New to Flutter? Start here:
 🧑‍💻 About the Author
 Created with ❤️ by [Son Nguyen]
 📫 Contact: son28062005@gmail.com
-🌐 GitHub: github.com/yourusername
+🌐 GitHub: git@github.com:Sotharmory
 
 📄 License
 This project is licensed under the MIT License. See LICENSE for more information.
